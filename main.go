@@ -451,21 +451,6 @@ func isBlockECB(fn func([]byte) []byte) bool {
 	return status
 }
 
-/*func isBlockCBC(fn func([]byte) []byte) bool {
-    //XXX testing purposes, not working
-    status := false
-    pt := genSingleByteSlice(byte(0), 5000)
-    ct := fn(pt)
-    chunks := splitBtsInChunks(ct, 16)
-    for _, chunk := range chunks {
-        fmt.Printf("%v %d\n", chunk, len(chunk))
-    }
-    fmt.Printf("%v\n", chunks[len(chunks)-3])
-    fmt.Printf("pt: %08b\n", chunks[len(chunks)-3])
-    //status := detectECB(ct)
-    return status
-}*/
-
 func eleventh() {
 	ecb := isBlockECB(encryptionOracle)
 	if ecb == true {
@@ -475,6 +460,53 @@ func eleventh() {
 	}
 }
 
+func ECBOracle(data []byte) []byte {
+	key := genSingleByteSlice(byte(127), 16)
+	bs64 := "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg" +
+		"aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq" +
+		"dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg" +
+		"YnkK"
+	unknown, _ := base64.StdEncoding.DecodeString(bs64)
+	pt := data
+	pt = append(pt, unknown...)
+	pt = pkcs7(pt, 16)
+	res := encryptECB(pt, key)
+	return res
+}
+
+func decodeECBAESBlock() []byte {
+	res := []byte{}
+	blk := len(ECBOracle([]byte{}))
+
+	for j := blk - 1; j >= 0; j-- {
+		pt := genSingleByteSlice(byte(0), blk)
+		dict := map[string]byte{}
+		if j < blk-1 {
+			offset := blk - 2
+			for l := len(res) - 1; l >= 0; l-- {
+				pt[offset] = res[l]
+				offset -= 1
+			}
+		}
+		for i := 0; i < 256; i++ {
+			pt[blk-1] = byte(i)
+			ct := ECBOracle(pt)
+			hx := hex.EncodeToString(ct[0:blk])
+			dict[hx] = byte(i)
+		}
+		mod := pt[0:j]
+		ct := ECBOracle(mod)
+		hx := hex.EncodeToString(ct[0:blk])
+		res = append(res, dict[hx])
+	}
+	return res
+}
+
+func twelfth() {
+	block := decodeECBAESBlock()
+	fmt.Printf("The plaintext is: \n\n%s\n", string(block))
+}
+
 func main() {
-	eleventh()
+	twelfth()
 }
