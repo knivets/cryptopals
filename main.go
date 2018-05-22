@@ -502,11 +502,80 @@ func decodeECBAESBlock() []byte {
 	return res
 }
 
+// workaround to have a deterministic element order
+type KV struct {
+    key string
+    val string
+}
+
+func parseKVStr(data string) []KV {
+    res := []KV{}
+    pairs := strings.Split(data, "&")
+    for _, pair := range pairs {
+        kv := strings.Split(pair, "=")
+        res = append(res, KV{key: kv[0], val: kv[1]})
+    }
+    return res
+}
+
+func profileFor(email string) string {
+    data := []KV{
+        KV{key: "uid", val: "10"},
+        KV{key: "role", val:  "user"},
+    }
+    san := strings.Replace(email, "&", "", -1)
+    san = strings.Replace(san, "=", "", -1)
+    data = append([]KV{KV{key: "email", val: san}}, data...)
+    pairs := []string{}
+    for _, kv := range data {
+        pairs = append(pairs, kv.key + "=" + kv.val)
+    }
+
+    return strings.Join(pairs, "&")
+}
+
+func encryptProfile(email string, key []byte) []byte {
+    pt := profileFor(email)
+	pad := pkcs7([]byte(pt), 16)
+	res := encryptECB(pad, key)
+    return res
+}
+
+func decryptProfile(ct []byte, key []byte) []KV {
+    pt := decryptECB(ct, key)
+    ob := parseKVStr(string(pt))
+    return ob
+}
+
+func produceAdminBlk(key []byte, padding int) []byte {
+    in := []byte("bbbbbbbbbbadmin")
+    in = append(in, genSingleByteSlice(byte(padding), padding)...)
+    enc := encryptProfile(string(in), key)
+    blk := enc[16:32]
+    return blk
+}
+
+func makeAdminProfile(key []byte) []byte {
+    in := []byte("max@gmail.com")
+    enc := encryptProfile(string(in), key)
+    blk := produceAdminBlk(key, 11)
+    rwr := enc[0:len(enc)-16]
+    rwr = append(rwr, blk...)
+    return rwr
+}
+
 func twelfth() {
 	block := decodeECBAESBlock()
 	fmt.Printf("The plaintext is: \n\n%s\n", string(block))
 }
 
+func thirteenth() {
+	key := genSingleByteSlice(byte(127), 16)
+    rwr := makeAdminProfile(key)
+    dec := decryptProfile(rwr, key)
+    fmt.Printf("%q\n", dec)
+}
+
 func main() {
-	twelfth()
+	thirteenth()
 }
