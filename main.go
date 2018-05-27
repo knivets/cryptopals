@@ -132,8 +132,10 @@ func Thirteenth() {
 }
 
 func Fourteenth() {
+	res := second.DecodeECBAESBlockWithPrefix()
+	fmt.Printf("%s\n", res)
 }
 
 func main() {
-	Thirteenth()
+	Fourteenth()
 }
