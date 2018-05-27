@@ -3,14 +3,14 @@ package second
 import (
 	"crypto/aes"
 	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
-	"log"
-	"math/big"
-	"fmt"
-	"strings"
 	"cryptopals/ecb"
 	"cryptopals/first"
+	"encoding/base64"
+	"encoding/hex"
+	"fmt"
+	"log"
+	"math/big"
+	"strings"
 )
 
 func Pkcs7(block []byte, size int) []byte {
@@ -252,105 +252,106 @@ func ECBPrefixOracle(data []byte, prefix []byte) []byte {
 }
 
 func PrintChunks(data []byte, size int) {
-    chunks := first.SplitBtsInChunks(data, size)
-    for i, chunk := range chunks {
-        fmt.Printf("%d: %x\n", i, chunk)
-    }
+	chunks := first.SplitBtsInChunks(data, size)
+	for i, chunk := range chunks {
+		fmt.Printf("%d: %x\n", i, chunk)
+	}
 }
 
 func getNumOfDuplicateBlocks(data []byte) int {
-    chunks := first.SplitBtsInChunks(data, 16)
-    blks := map[string]int{}
-    count := 1
-    for _, chunk := range chunks {
-        hx := hex.EncodeToString(chunk)
+	chunks := first.SplitBtsInChunks(data, 16)
+	blks := map[string]int{}
+	count := 1
+	for _, chunk := range chunks {
+		hx := hex.EncodeToString(chunk)
 		if _, ok := blks[hx]; ok {
-            count += 1
-        } else {
-            blks[hx] = 1
-        }
-    }
-    return count
+			count += 1
+		} else {
+			blks[hx] = 1
+		}
+	}
+	return count
 }
 
 func guessInputPrefixLength(prefix []byte) int {
-    num := 0
-    // guessing max length to have multiple blocks
-    for i := 1; i < 10; i++ {
-        num = 64*i
-        in := first.GenSingleByteSlice(byte(0), num)
-        res := ECBPrefixOracle(in, prefix)
-        dup := getNumOfDuplicateBlocks(res)
-        if dup > 2 {
-            break
-        }
-    }
-    // reducing prefix to a single block
-    for i := num; i >= 0; i-- {
-        in := first.GenSingleByteSlice(byte(0), i)
-        res := ECBPrefixOracle(in, prefix)
-        nwDp := getNumOfDuplicateBlocks(res)
-        if nwDp == 1 {
-            num = i
-            break
-        }
-    }
-    return num + 1
+	// arbitrary number to produce a high level of dups
+	num := 1024
+	in := first.GenSingleByteSlice(byte(0), num)
+	res := ECBPrefixOracle(in, prefix)
+	dup := getNumOfDuplicateBlocks(res)
+	// low chance that there are 20 16-byte blocks of
+	// exact plaintext
+	if dup > 20 {
+		// reducing prefix to a single block
+		// probably breaks in case we have duplicate
+		// plaintext blocks, though not a problem to
+		// handle this case
+		for i := num; i >= 0; i-- {
+			in := first.GenSingleByteSlice(byte(0), i)
+			res := ECBPrefixOracle(in, prefix)
+			nwDp := getNumOfDuplicateBlocks(res)
+			if nwDp == 1 {
+				num = i
+				break
+			}
+		}
+	}
+	return num + 1
 }
 
 func getBlkOffset(inputPrefix int, prefix []byte) int {
-    in := first.GenSingleByteSlice(byte(0), inputPrefix)
-    res := ECBPrefixOracle(in, prefix)
-    chunks := first.SplitBtsInChunks(res, 16)
-    blks := map[string]int{}
-    offset := 0
-    for i, chunk := range chunks {
-        hx := hex.EncodeToString(chunk)
+	in := first.GenSingleByteSlice(byte(0), inputPrefix)
+	res := ECBPrefixOracle(in, prefix)
+	chunks := first.SplitBtsInChunks(res, 16)
+	blks := map[string]int{}
+	offset := 0
+	for i, chunk := range chunks {
+		hx := hex.EncodeToString(chunk)
 		if _, ok := blks[hx]; ok {
-            offset = (i+1) * 16
-        } else {
-            blks[hx] = 1
-        }
-    }
-    return offset
+			offset = (i + 1) * 16
+		} else {
+			blks[hx] = 1
+		}
+	}
+	return offset
 }
 
 func getBlkSize(inputOffset, blkOffset int, prefix []byte) int {
-    in := first.GenSingleByteSlice(byte(0), inputOffset)
+	in := first.GenSingleByteSlice(byte(0), inputOffset)
 	res := ECBPrefixOracle(in, prefix)
-    return len(res) - blkOffset
+	return len(res) - blkOffset
 }
 
 func DecodeECBAESBlockWithPrefix() []byte {
-    startCount := 5 + genRandomNum(64)
+	startCount := 5 + genRandomNum(64)
 	startBts := genRandomBytes(startCount)
 	res := []byte{}
-    inputOffset := guessInputPrefixLength(startBts)
-    blkOffset := getBlkOffset(inputOffset, startBts)
-    blk := getBlkSize(inputOffset, blkOffset, startBts)
-	/*fmt.Printf("input offset: %d\n", inputOffset)
+	inputOffset := guessInputPrefixLength(startBts)
+	blkOffset := getBlkOffset(inputOffset, startBts)
+	blk := getBlkSize(inputOffset, blkOffset, startBts)
+	fmt.Printf("input offset: %d\n", inputOffset)
 	fmt.Printf("blk offset: %d\n", blkOffset)
-	fmt.Printf("block length: %d\n\n", blk)*/
+	fmt.Printf("block length: %d\n\n", blk)
 
 	for j := blk - 1; j >= 0; j-- {
-		pt := first.GenSingleByteSlice(byte(0), inputOffset + blk)
+		pt := first.GenSingleByteSlice(byte(0), inputOffset+blk)
 		dict := map[string]byte{}
 		if j < blk-1 {
 			offset := blk - 2
 			for l := len(res) - 1; l >= 0; l-- {
-				pt[inputOffset + offset] = res[l]
+				pt[inputOffset+offset] = res[l]
 				offset -= 1
 			}
 		}
 		for i := 0; i < 256; i++ {
-			pt[inputOffset + blk-1] = byte(i)
+			pt[inputOffset+blk-1] = byte(i)
 			ct := ECBPrefixOracle(pt, startBts)
-			hx := hex.EncodeToString(ct[blkOffset:blkOffset + blk])
+			hx := hex.EncodeToString(ct[blkOffset : blkOffset+blk])
 			dict[hx] = byte(i)
 		}
-		mod := pt[0:inputOffset + j]
+		mod := pt[0 : inputOffset+j]
 		ct := ECBPrefixOracle(mod, startBts)
-		hx := hex.EncodeToString(ct[blkOffset:blkOffset + blk])
+		hx := hex.EncodeToString(ct[blkOffset : blkOffset+blk])
 		res = append(res, dict[hx])
 	}
 	return res
