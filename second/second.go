@@ -7,6 +7,7 @@ import (
 	"cryptopals/first"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -243,6 +244,7 @@ func ECBPrefixOracle(data []byte, prefix []byte) []byte {
 		"dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg" +
 		"YnkK"
 	unknown, _ := base64.StdEncoding.DecodeString(bs64)
+	unknown = []byte("Rollin' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by\n testbb")
 	pt := prefix
 	pt = append(pt, data...)
 	pt = append(pt, unknown...)
@@ -329,9 +331,9 @@ func DecodeECBAESBlockWithPrefix() []byte {
 	inputOffset := guessInputPrefixLength(startBts)
 	blkOffset := getBlkOffset(inputOffset, startBts)
 	blk := getBlkSize(inputOffset, blkOffset, startBts)
-	fmt.Printf("input offset: %d\n", inputOffset)
+	/*fmt.Printf("input offset: %d\n", inputOffset)
 	fmt.Printf("blk offset: %d\n", blkOffset)
-	fmt.Printf("block length: %d\n\n", blk)
+	fmt.Printf("block length: %d\n\n", blk)*/
 
 	for j := blk - 1; j >= 0; j-- {
 		pt := first.GenSingleByteSlice(byte(0), inputOffset+blk)
@@ -355,4 +357,20 @@ func DecodeECBAESBlockWithPrefix() []byte {
 		res = append(res, dict[hx])
 	}
 	return res
+}
+
+func StripPkcs7(data []byte) ([]byte, error) {
+	stripped := data
+	padding := data[len(data)-1]
+	paddingInt := int(padding)
+	if paddingInt < 16 {
+		for i := 0; i < paddingInt; i++ {
+			pos := len(data) - 1 - i
+			if data[pos] != padding {
+				return []byte{}, errors.New("wrong padding")
+			}
+			stripped = stripped[:pos]
+		}
+	}
+	return stripped, nil
 }

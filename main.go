@@ -136,6 +136,18 @@ func Fourteenth() {
 	fmt.Printf("%s\n", res)
 }
 
+func Fifteenth() {
+	pt1 := []byte("ICE ICE BABY\x04\x04\x04\x04")
+	str1, _ := second.StripPkcs7(pt1)
+	fmt.Printf("stripped: %q\n", str1)
+	pt2 := []byte("ICE ICE BABY\x05\x05\x05\x05")
+	str2, _ := second.StripPkcs7(pt2)
+	fmt.Printf("stripped: %q\n", str2)
+	pt3 := []byte("ICE ICE BABY\x01\x02\x03\x04")
+	str3, _ := second.StripPkcs7(pt3)
+	fmt.Printf("stripped: %q\n", str3)
+}
+
 func main() {
-	Fourteenth()
+	Fifteenth()
 }
