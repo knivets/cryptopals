@@ -374,3 +374,51 @@ func StripPkcs7(data []byte) ([]byte, error) {
 	}
 	return stripped, nil
 }
+
+func userDataEncodeCBC(data string, iv []byte, key []byte) []byte {
+	prefix := "comment1=cooking%20MCs;userdata="
+	suffix := ";comment2=%20like%20a%20pound%20of%20bacon"
+
+	san := strings.Replace(data, ";", "", -1)
+	san = strings.Replace(san, "=", "", -1)
+	pt := prefix + san + suffix
+	pad := Pkcs7([]byte(pt), 16)
+	fmt.Printf("%q\n", pad)
+	res := encryptCBC(pad, iv, key)
+	return res
+}
+
+func userDataDecodeCBC(ciph []byte, iv []byte, key []byte) bool {
+	admin := false
+	pt := DecryptCBC(ciph, iv, key)
+	fmt.Printf("%q\n", pt)
+	//pt, _ = StripPkcs7(pt)
+	kvs := [][]string{}
+	pairs := strings.Split(string(pt), ";")
+	for _, pair := range pairs {
+		kv := strings.Split(pair, "=")
+		kvs = append(kvs, kv)
+	}
+	for _, kv := range kvs {
+		if len(kv) > 1 {
+			if strings.Contains(kv[0], "admin") {
+				if kv[1] == "true" {
+					admin = true
+				}
+			}
+		}
+	}
+	return admin
+}
+
+func Sixteenth() {
+	key := first.GenSingleByteSlice(byte(32), 16)
+	iv := first.GenSingleByteSlice(byte(64), 16)
+	in := first.GenSingleByteSlice(byte('a'), 33)
+	in = append(in, []byte("adminttrue")...)
+	res := userDataEncodeCBC(string(in), iv, key)
+	res[48] = byte(60)
+	res[54] = byte(254)
+	admin := userDataDecodeCBC(res, iv, key)
+	fmt.Printf("%t\n", admin)
+}
