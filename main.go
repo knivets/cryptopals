@@ -3,6 +3,7 @@ package main
 import (
 	"cryptopals/first"
 	"cryptopals/second"
+	"cryptopals/third"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -148,6 +149,35 @@ func Fifteenth() {
 	fmt.Printf("stripped: %q\n", str3)
 }
 
+func Sixteenth() {
+	second.RewriteCBC()
+}
+
+func Seventeenth() {
+	key := first.GenSingleByteSlice(byte(48), 16)
+	iv := first.GenSingleByteSlice(byte(96), 16)
+	ciph := third.CBCPaddingOracle(iv, key)
+	pt := []byte{}
+	ln := len(ciph)
+	i := 0
+	for true {
+		if end := ln - 32 - (i * 16); end >= 0 {
+			start := ln - (i * 16)
+			blk := ciph[end:start]
+			dec := third.DecodeCBCBlock(blk, iv, key)
+			pt = append(dec, pt...)
+			i++
+		} else {
+			break
+		}
+	}
+	frst := append([]byte{}, iv...)
+	frst = append(frst, ciph[0:16]...)
+	dec := third.DecodeCBCBlock(frst, iv, key)
+	pt = append(dec, pt...)
+	fmt.Printf("plaintext is: %q\n", pt)
+}
+
 func main() {
-	second.Sixteenth()
+	Seventeenth()
 }

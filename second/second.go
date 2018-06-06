@@ -16,9 +16,7 @@ import (
 
 func Pkcs7(block []byte, size int) []byte {
 	num := len(block) % size
-	if num != 0 {
-		num = size - num
-	}
+	num = size - num
 	for i := 0; i < num; i++ {
 		block = append(block, byte(num))
 	}
@@ -36,7 +34,7 @@ func encryptECB(ciph []byte, key []byte) []byte {
 	return pt
 }
 
-func encryptCBC(pt []byte, iv []byte, key []byte) []byte {
+func EncryptCBC(pt []byte, iv []byte, key []byte) []byte {
 	chunks := first.SplitBtsInChunks(pt, 16)
 	blocks := []byte{}
 	ciph := iv
@@ -74,7 +72,7 @@ func genRandomBytes(num int) []byte {
 	return bts
 }
 
-func genRandomNum(num int) int {
+func GenRandomNum(num int) int {
 	res, _ := rand.Int(rand.Reader, big.NewInt(int64(num)))
 	return int(res.Int64())
 }
@@ -86,11 +84,11 @@ func detectCBC(data []byte) bool {
 
 func EncryptionOracle(data []byte) []byte {
 	key := genRandomBytes(16)
-	startCount := 5 + genRandomNum(6)
-	endCount := 5 + genRandomNum(6)
+	startCount := 5 + GenRandomNum(6)
+	endCount := 5 + GenRandomNum(6)
 	startBts := genRandomBytes(startCount)
 	endBts := genRandomBytes(endCount)
-	mode := genRandomNum(2)
+	mode := GenRandomNum(2)
 	pt := startBts
 	pt = append(pt, data...)
 	pt = append(pt, endBts...)
@@ -100,7 +98,7 @@ func EncryptionOracle(data []byte) []byte {
 		res = encryptECB(pt, key)
 	} else {
 		iv := genRandomBytes(16)
-		res = encryptCBC(pt, iv, key)
+		res = EncryptCBC(pt, iv, key)
 	}
 	return res
 }
@@ -216,6 +214,7 @@ func encryptProfile(email string, key []byte) []byte {
 
 func DecryptProfile(ct []byte, key []byte) []KV {
 	pt := first.DecryptECB(ct, key)
+	pt, _ = StripPkcs7(pt)
 	ob := parseKVStr(string(pt))
 	return ob
 }
@@ -244,7 +243,7 @@ func ECBPrefixOracle(data []byte, prefix []byte) []byte {
 		"dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg" +
 		"YnkK"
 	unknown, _ := base64.StdEncoding.DecodeString(bs64)
-	unknown = []byte("Rollin' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by\n testbb")
+	//unknown = []byte("Rollin' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by\n test")
 	pt := prefix
 	pt = append(pt, data...)
 	pt = append(pt, unknown...)
@@ -325,7 +324,7 @@ func getBlkSize(inputOffset, blkOffset int, prefix []byte) int {
 }
 
 func DecodeECBAESBlockWithPrefix() []byte {
-	startCount := 5 + genRandomNum(64)
+	startCount := 5 + GenRandomNum(64)
 	startBts := genRandomBytes(startCount)
 	res := []byte{}
 	inputOffset := guessInputPrefixLength(startBts)
@@ -363,16 +362,23 @@ func StripPkcs7(data []byte) ([]byte, error) {
 	stripped := data
 	padding := data[len(data)-1]
 	paddingInt := int(padding)
-	if paddingInt < 16 {
-		for i := 0; i < paddingInt; i++ {
-			pos := len(data) - 1 - i
-			if data[pos] != padding {
-				return []byte{}, errors.New("wrong padding")
-			}
-			stripped = stripped[:pos]
-		}
+	valid := true
+	if paddingInt == 0 {
+		valid = false
 	}
-	return stripped, nil
+	for i := 0; i < paddingInt; i++ {
+		pos := len(data) - 1 - i
+		if data[pos] != padding {
+			valid = false
+			break
+		}
+		stripped = stripped[:pos]
+	}
+	if valid == true {
+		return stripped, nil
+	} else {
+		return []byte{}, errors.New("wrong padding")
+	}
 }
 
 func userDataEncodeCBC(data string, iv []byte, key []byte) []byte {
@@ -384,7 +390,7 @@ func userDataEncodeCBC(data string, iv []byte, key []byte) []byte {
 	pt := prefix + san + suffix
 	pad := Pkcs7([]byte(pt), 16)
 	fmt.Printf("%q\n", pad)
-	res := encryptCBC(pad, iv, key)
+	res := EncryptCBC(pad, iv, key)
 	return res
 }
 
@@ -411,7 +417,7 @@ func userDataDecodeCBC(ciph []byte, iv []byte, key []byte) bool {
 	return admin
 }
 
-func Sixteenth() {
+func RewriteCBC() {
 	key := first.GenSingleByteSlice(byte(32), 16)
 	iv := first.GenSingleByteSlice(byte(64), 16)
 	in := first.GenSingleByteSlice(byte('a'), 33)
