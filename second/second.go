@@ -23,7 +23,7 @@ func Pkcs7(block []byte, size int) []byte {
 	return block
 }
 
-func encryptECB(ciph []byte, key []byte) []byte {
+func EncryptECB(ciph []byte, key []byte) []byte {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		log.Fatal(err)
@@ -43,7 +43,7 @@ func EncryptCBC(pt []byte, iv []byte, key []byte) []byte {
 			chunk = Pkcs7(chunk, 16)
 		}
 		section := first.XOR(ciph, chunk)
-		ciph = encryptECB(section, key)
+		ciph = EncryptECB(section, key)
 		blocks = append(blocks, ciph...)
 	}
 	return blocks
@@ -95,7 +95,7 @@ func EncryptionOracle(data []byte) []byte {
 	pt = Pkcs7(pt, 16)
 	res := []byte{}
 	if mode == 0 {
-		res = encryptECB(pt, key)
+		res = EncryptECB(pt, key)
 	} else {
 		iv := genRandomBytes(16)
 		res = EncryptCBC(pt, iv, key)
@@ -141,7 +141,7 @@ func ECBOracle(data []byte) []byte {
 	pt := data
 	pt = append(pt, unknown...)
 	pt = Pkcs7(pt, 16)
-	res := encryptECB(pt, key)
+	res := EncryptECB(pt, key)
 	return res
 }
 
@@ -208,7 +208,7 @@ func profileFor(email string) string {
 func encryptProfile(email string, key []byte) []byte {
 	pt := profileFor(email)
 	pad := Pkcs7([]byte(pt), 16)
-	res := encryptECB(pad, key)
+	res := EncryptECB(pad, key)
 	return res
 }
 
@@ -248,7 +248,7 @@ func ECBPrefixOracle(data []byte, prefix []byte) []byte {
 	pt = append(pt, data...)
 	pt = append(pt, unknown...)
 	pt = Pkcs7(pt, 16)
-	res := encryptECB(pt, key)
+	res := EncryptECB(pt, key)
 	return res
 }
 

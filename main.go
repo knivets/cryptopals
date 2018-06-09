@@ -178,6 +178,13 @@ func Seventeenth() {
 	fmt.Printf("plaintext is: %q\n", pt)
 }
 
+func Eighteenth() {
+	bs := "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=="
+	ct, _ := base64.StdEncoding.DecodeString(bs)
+	pt := third.DecryptCTR(ct, []byte("YELLOW SUBMARINE"), uint64(0))
+	fmt.Printf("%q\n", pt)
+}
+
 func main() {
-	Seventeenth()
+	Eighteenth()
 }

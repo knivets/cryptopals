@@ -1,13 +1,15 @@
 package third
 
 import (
-	_ "cryptopals/first"
+	"cryptopals/first"
 	"cryptopals/second"
 	_ "encoding/base64"
+	"encoding/binary"
 	_ "encoding/hex"
 	_ "errors"
 	_ "fmt"
 	_ "log"
+	"math"
 	_ "strings"
 )
 
@@ -82,5 +84,23 @@ func DecodeCBCBlock(blk, iv, key []byte) []byte {
 	for i := 0; i < len(decr); i++ {
 		pt = append([]byte{decr[i] ^ block[15-i]}, pt...)
 	}
+	return pt
+}
+
+func EncryptCTR(blk, key []byte, nonce uint64) []byte {
+	pt := make([]byte, 16)
+	binary.LittleEndian.PutUint64(pt[0:8], nonce)
+	count := int(math.Ceil(float64(len(blk)) / 16))
+	keystream := []byte{}
+	for i := 0; i < count; i++ {
+		binary.LittleEndian.PutUint64(pt[8:16], uint64(i))
+		keystream = append(keystream, second.EncryptECB(pt, key)...)
+	}
+	ct := first.XOR(blk, keystream[0:len(blk)])
+	return ct
+}
+
+func DecryptCTR(blk, key []byte, nonce uint64) []byte {
+	pt := EncryptCTR(blk, key, nonce)
 	return pt
 }
