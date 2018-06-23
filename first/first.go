@@ -30,7 +30,7 @@ func XOR(first []byte, second []byte) []byte {
 	return res
 }
 
-func englishTextScore(data []byte) int {
+func EnglishTextScore(data []byte) int {
 	chrs := "etaoin shrdluETAOIN SHRDLU"
 	score := 0
 	for _, bt := range data {
@@ -61,7 +61,7 @@ func SolveSingleCharXOR(src []byte) ByteScore {
 		bt := byte(i)
 		key := GenSingleByteSlice(bt, len(src))
 		res := XOR(src, key)
-		score := englishTextScore(res)
+		score := EnglishTextScore(res)
 		scores = append(scores, ByteScore{bt, score})
 	}
 	sort.Slice(scores, func(i, j int) bool {
@@ -208,7 +208,7 @@ func SolveRollingXOR(data []byte) []byte {
 	key := []byte{}
 	for _, potKey := range potKeys {
 		res := RollingXOR(data, potKey)
-		currScore := englishTextScore(res)
+		currScore := EnglishTextScore(res)
 		if currScore > score {
 			score = currScore
 			key = potKey
