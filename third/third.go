@@ -8,9 +8,10 @@ import (
 	_ "encoding/hex"
 	_ "errors"
 	"fmt"
-	_ "log"
+	"log"
 	"math"
-	_ "strings"
+	"strings"
+	"io/ioutil"
 )
 
 func CBCPaddingOracle(iv []byte, key []byte) []byte {
@@ -105,7 +106,17 @@ func DecryptCTR(blk, key []byte, nonce uint64) []byte {
 	return pt
 }
 
-func Nineteenth(){
+func getLongestSliceLen(slices [][]byte) int {
+    maxLen := 0
+    for _, slc := range slices {
+        if ln := len(slc); ln > maxLen {
+            maxLen = ln
+        }
+    }
+    return maxLen
+}
+
+func BreakCTR(){
     nonce := 0
 	key := first.GenSingleByteSlice(byte(64), 16)
     cts := [][]byte{}
@@ -156,12 +167,7 @@ func Nineteenth(){
         ct := EncryptCTR(dec, key, uint64(nonce))
         cts = append(cts, ct)
     }
-    maxLen := 0
-    for _, ct := range cts {
-        if ln := len(ct); ln > maxLen {
-            maxLen = ln
-        }
-    }
+    maxLen := getLongestSliceLen(cts)
     var bt byte
     potKey := []byte{}
     for j := 0; j < maxLen; j++ {
@@ -196,4 +202,65 @@ func Nineteenth(){
         fmt.Printf("%q\n", z)
     }
     fmt.Printf("%x\n", potKey)
+}
+
+func getPotentialKeysCTR(data []byte, size int) [][]byte {
+	var potKeys [][]byte
+    chunks := first.SplitBtsInChunks(data, size)
+    transposed := first.TransposeChunks(chunks)
+    var potKey []byte
+    for _, chunk := range transposed {
+        bt := first.SolveSingleCharXOR(chunk)
+        potKey = append(potKey, bt.Bt)
+    }
+    potKeys = append(potKeys, potKey)
+	return potKeys
+}
+
+func SolveRollingXORCTR(data []byte, size int) []byte {
+	potKeys := getPotentialKeysCTR(data, size)
+	score := 0
+	key := []byte{}
+	for _, potKey := range potKeys {
+		res := first.RollingXOR(data, potKey)
+		currScore := first.EnglishTextScore(res)
+		if currScore > score {
+			score = currScore
+			key = potKey
+		}
+	}
+	return key
+}
+
+func Twenth() {
+    data, err := ioutil.ReadFile("20.txt")
+    if err != nil {
+        log.Fatal(err)
+    }
+    lines := strings.Split(string(data), "\n")
+    lines = lines[0:len(lines)-1]
+    cts := [][]byte{}
+    nonce := 0
+	key := first.GenSingleByteSlice(byte(64), 16)
+    for _, line := range lines {
+        pt, _ := base64.StdEncoding.DecodeString(line)
+        ct := EncryptCTR(pt, key, uint64(nonce))
+        cts = append(cts, ct)
+    }
+    minLen := 0
+    for _, ct := range cts {
+        if ln := len(ct); minLen == 0 || ln < minLen {
+            minLen = ln
+        }
+    }
+    ciph := []byte{}
+    for _, ct := range cts {
+        ciph = append(ciph, ct[0:minLen]...)
+    }
+    key = SolveRollingXORCTR(ciph, minLen)
+    key[0] = byte(173)
+    for _, ct := range cts {
+        pt := first.XOR(ct, key)
+        fmt.Printf("%q\n", pt)
+    }
 }

@@ -20,6 +20,9 @@ func HexToBase64(src string) []byte {
 }
 
 func XOR(first []byte, second []byte) []byte {
+    if len(first) > len(second) {
+		first = first[:len(second)]
+	}
 	if len(first) != len(second) {
 		log.Fatal("XOR expects two equal length buffers")
 	}
@@ -172,7 +175,7 @@ func SplitBtsInChunks(data []byte, size int) [][]byte {
 	return res
 }
 
-func transposeChunks(chunks [][]byte) [][]byte {
+func TransposeChunks(chunks [][]byte) [][]byte {
 	var res [][]byte
 	for j := 0; j < len(chunks[0]); j++ {
 		var bt []byte
@@ -191,7 +194,7 @@ func getPotentialKeys(data []byte) [][]byte {
 	var potKeys [][]byte
 	for _, size := range sizes[0:2] {
 		chunks := SplitBtsInChunks(data, size.Size)
-		transposed := transposeChunks(chunks)
+		transposed := TransposeChunks(chunks)
 		var potKey []byte
 		for _, chunk := range transposed {
 			bt := SolveSingleCharXOR(chunk)
