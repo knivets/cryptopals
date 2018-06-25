@@ -8,10 +8,10 @@ import (
 	_ "encoding/hex"
 	_ "errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"strings"
-	"io/ioutil"
 )
 
 func CBCPaddingOracle(iv []byte, key []byte) []byte {
@@ -107,113 +107,113 @@ func DecryptCTR(blk, key []byte, nonce uint64) []byte {
 }
 
 func getLongestSliceLen(slices [][]byte) int {
-    maxLen := 0
-    for _, slc := range slices {
-        if ln := len(slc); ln > maxLen {
-            maxLen = ln
-        }
-    }
-    return maxLen
+	maxLen := 0
+	for _, slc := range slices {
+		if ln := len(slc); ln > maxLen {
+			maxLen = ln
+		}
+	}
+	return maxLen
 }
 
-func BreakCTR(){
-    nonce := 0
+func BreakCTR() {
+	nonce := 0
 	key := first.GenSingleByteSlice(byte(64), 16)
-    cts := [][]byte{}
+	cts := [][]byte{}
 	pts := []string{
-        "SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==",
-        "Q29taW5nIHdpdGggdml2aWQgZmFjZXM=",
-        "RnJvbSBjb3VudGVyIG9yIGRlc2sgYW1vbmcgZ3JleQ==",
-        "RWlnaHRlZW50aC1jZW50dXJ5IGhvdXNlcy4=",
-        "SSBoYXZlIHBhc3NlZCB3aXRoIGEgbm9kIG9mIHRoZSBoZWFk",
-        "T3IgcG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==",
-        "T3IgaGF2ZSBsaW5nZXJlZCBhd2hpbGUgYW5kIHNhaWQ=",
-        "UG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==",
-        "QW5kIHRob3VnaHQgYmVmb3JlIEkgaGFkIGRvbmU=",
-        "T2YgYSBtb2NraW5nIHRhbGUgb3IgYSBnaWJl",
-        "VG8gcGxlYXNlIGEgY29tcGFuaW9u",
-        "QXJvdW5kIHRoZSBmaXJlIGF0IHRoZSBjbHViLA==",
-        "QmVpbmcgY2VydGFpbiB0aGF0IHRoZXkgYW5kIEk=",
-        "QnV0IGxpdmVkIHdoZXJlIG1vdGxleSBpcyB3b3JuOg==",
-        "QWxsIGNoYW5nZWQsIGNoYW5nZWQgdXR0ZXJseTo=",
-        "QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=",
-        "VGhhdCB3b21hbidzIGRheXMgd2VyZSBzcGVudA==",
-        "SW4gaWdub3JhbnQgZ29vZCB3aWxsLA==",
-        "SGVyIG5pZ2h0cyBpbiBhcmd1bWVudA==",
-        "VW50aWwgaGVyIHZvaWNlIGdyZXcgc2hyaWxsLg==",
-        "V2hhdCB2b2ljZSBtb3JlIHN3ZWV0IHRoYW4gaGVycw==",
-        "V2hlbiB5b3VuZyBhbmQgYmVhdXRpZnVsLA==",
-        "U2hlIHJvZGUgdG8gaGFycmllcnM/",
-        "VGhpcyBtYW4gaGFkIGtlcHQgYSBzY2hvb2w=",
-        "QW5kIHJvZGUgb3VyIHdpbmdlZCBob3JzZS4=",
-        "VGhpcyBvdGhlciBoaXMgaGVscGVyIGFuZCBmcmllbmQ=",
-        "V2FzIGNvbWluZyBpbnRvIGhpcyBmb3JjZTs=",
-        "SGUgbWlnaHQgaGF2ZSB3b24gZmFtZSBpbiB0aGUgZW5kLA==",
-        "U28gc2Vuc2l0aXZlIGhpcyBuYXR1cmUgc2VlbWVkLA==",
-        "U28gZGFyaW5nIGFuZCBzd2VldCBoaXMgdGhvdWdodC4=",
-        "VGhpcyBvdGhlciBtYW4gSSBoYWQgZHJlYW1lZA==",
-        "QSBkcnVua2VuLCB2YWluLWdsb3Jpb3VzIGxvdXQu",
-        "SGUgaGFkIGRvbmUgbW9zdCBiaXR0ZXIgd3Jvbmc=",
-        "VG8gc29tZSB3aG8gYXJlIG5lYXIgbXkgaGVhcnQs",
-        "WWV0IEkgbnVtYmVyIGhpbSBpbiB0aGUgc29uZzs=",
-        "SGUsIHRvbywgaGFzIHJlc2lnbmVkIGhpcyBwYXJ0",
-        "SW4gdGhlIGNhc3VhbCBjb21lZHk7",
-        "SGUsIHRvbywgaGFzIGJlZW4gY2hhbmdlZCBpbiBoaXMgdHVybiw=",
-        "VHJhbnNmb3JtZWQgdXR0ZXJseTo=",
-        "QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=",
-    }
-    for _, pt := range pts {
-        dec, _ := base64.StdEncoding.DecodeString(pt)
-        ct := EncryptCTR(dec, key, uint64(nonce))
-        cts = append(cts, ct)
-    }
-    maxLen := getLongestSliceLen(cts)
-    var bt byte
-    potKey := []byte{}
-    for j := 0; j < maxLen; j++ {
-        score := 0
-        for i := 0; i < 256; i++ {
-            chars := []byte{}
-            for _, ct := range cts {
-                ln := len(ct)
-                if j <= (ln - 1) {
-                    chars = append(chars, ct[j])
-                }
-            }
-            dec := first.XOR(chars, first.GenSingleByteSlice(byte(i), len(chars)))
-            curr := first.EnglishTextScore(dec)
-            if curr > score {
-                score = curr
-                bt = byte(i)
-            }
-        }
-        potKey = append(potKey, bt)
-    }
-    // got from pure brute force
-    potKey[7] = byte(13)
-    potKey[30] = byte(115)
-    potKey[33] = byte(255)
-    potKey[34] = byte(156)
-    potKey[35] = byte(57)
-    potKey[36] = byte(42)
-    potKey[37] = byte(137)
-    for _, ct := range cts {
-        z := first.XOR(ct, potKey[0:len(ct)])
-        fmt.Printf("%q\n", z)
-    }
-    fmt.Printf("%x\n", potKey)
+		"SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==",
+		"Q29taW5nIHdpdGggdml2aWQgZmFjZXM=",
+		"RnJvbSBjb3VudGVyIG9yIGRlc2sgYW1vbmcgZ3JleQ==",
+		"RWlnaHRlZW50aC1jZW50dXJ5IGhvdXNlcy4=",
+		"SSBoYXZlIHBhc3NlZCB3aXRoIGEgbm9kIG9mIHRoZSBoZWFk",
+		"T3IgcG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==",
+		"T3IgaGF2ZSBsaW5nZXJlZCBhd2hpbGUgYW5kIHNhaWQ=",
+		"UG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==",
+		"QW5kIHRob3VnaHQgYmVmb3JlIEkgaGFkIGRvbmU=",
+		"T2YgYSBtb2NraW5nIHRhbGUgb3IgYSBnaWJl",
+		"VG8gcGxlYXNlIGEgY29tcGFuaW9u",
+		"QXJvdW5kIHRoZSBmaXJlIGF0IHRoZSBjbHViLA==",
+		"QmVpbmcgY2VydGFpbiB0aGF0IHRoZXkgYW5kIEk=",
+		"QnV0IGxpdmVkIHdoZXJlIG1vdGxleSBpcyB3b3JuOg==",
+		"QWxsIGNoYW5nZWQsIGNoYW5nZWQgdXR0ZXJseTo=",
+		"QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=",
+		"VGhhdCB3b21hbidzIGRheXMgd2VyZSBzcGVudA==",
+		"SW4gaWdub3JhbnQgZ29vZCB3aWxsLA==",
+		"SGVyIG5pZ2h0cyBpbiBhcmd1bWVudA==",
+		"VW50aWwgaGVyIHZvaWNlIGdyZXcgc2hyaWxsLg==",
+		"V2hhdCB2b2ljZSBtb3JlIHN3ZWV0IHRoYW4gaGVycw==",
+		"V2hlbiB5b3VuZyBhbmQgYmVhdXRpZnVsLA==",
+		"U2hlIHJvZGUgdG8gaGFycmllcnM/",
+		"VGhpcyBtYW4gaGFkIGtlcHQgYSBzY2hvb2w=",
+		"QW5kIHJvZGUgb3VyIHdpbmdlZCBob3JzZS4=",
+		"VGhpcyBvdGhlciBoaXMgaGVscGVyIGFuZCBmcmllbmQ=",
+		"V2FzIGNvbWluZyBpbnRvIGhpcyBmb3JjZTs=",
+		"SGUgbWlnaHQgaGF2ZSB3b24gZmFtZSBpbiB0aGUgZW5kLA==",
+		"U28gc2Vuc2l0aXZlIGhpcyBuYXR1cmUgc2VlbWVkLA==",
+		"U28gZGFyaW5nIGFuZCBzd2VldCBoaXMgdGhvdWdodC4=",
+		"VGhpcyBvdGhlciBtYW4gSSBoYWQgZHJlYW1lZA==",
+		"QSBkcnVua2VuLCB2YWluLWdsb3Jpb3VzIGxvdXQu",
+		"SGUgaGFkIGRvbmUgbW9zdCBiaXR0ZXIgd3Jvbmc=",
+		"VG8gc29tZSB3aG8gYXJlIG5lYXIgbXkgaGVhcnQs",
+		"WWV0IEkgbnVtYmVyIGhpbSBpbiB0aGUgc29uZzs=",
+		"SGUsIHRvbywgaGFzIHJlc2lnbmVkIGhpcyBwYXJ0",
+		"SW4gdGhlIGNhc3VhbCBjb21lZHk7",
+		"SGUsIHRvbywgaGFzIGJlZW4gY2hhbmdlZCBpbiBoaXMgdHVybiw=",
+		"VHJhbnNmb3JtZWQgdXR0ZXJseTo=",
+		"QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=",
+	}
+	for _, pt := range pts {
+		dec, _ := base64.StdEncoding.DecodeString(pt)
+		ct := EncryptCTR(dec, key, uint64(nonce))
+		cts = append(cts, ct)
+	}
+	maxLen := getLongestSliceLen(cts)
+	var bt byte
+	potKey := []byte{}
+	for j := 0; j < maxLen; j++ {
+		score := 0
+		for i := 0; i < 256; i++ {
+			chars := []byte{}
+			for _, ct := range cts {
+				ln := len(ct)
+				if j <= (ln - 1) {
+					chars = append(chars, ct[j])
+				}
+			}
+			dec := first.XOR(chars, first.GenSingleByteSlice(byte(i), len(chars)))
+			curr := first.EnglishTextScore(dec)
+			if curr > score {
+				score = curr
+				bt = byte(i)
+			}
+		}
+		potKey = append(potKey, bt)
+	}
+	// got from pure brute force
+	potKey[7] = byte(13)
+	potKey[30] = byte(115)
+	potKey[33] = byte(255)
+	potKey[34] = byte(156)
+	potKey[35] = byte(57)
+	potKey[36] = byte(42)
+	potKey[37] = byte(137)
+	for _, ct := range cts {
+		z := first.XOR(ct, potKey[0:len(ct)])
+		fmt.Printf("%q\n", z)
+	}
+	fmt.Printf("%x\n", potKey)
 }
 
 func getPotentialKeysCTR(data []byte, size int) [][]byte {
 	var potKeys [][]byte
-    chunks := first.SplitBtsInChunks(data, size)
-    transposed := first.TransposeChunks(chunks)
-    var potKey []byte
-    for _, chunk := range transposed {
-        bt := first.SolveSingleCharXOR(chunk)
-        potKey = append(potKey, bt.Bt)
-    }
-    potKeys = append(potKeys, potKey)
+	chunks := first.SplitBtsInChunks(data, size)
+	transposed := first.TransposeChunks(chunks)
+	var potKey []byte
+	for _, chunk := range transposed {
+		bt := first.SolveSingleCharXOR(chunk)
+		potKey = append(potKey, bt.Bt)
+	}
+	potKeys = append(potKeys, potKey)
 	return potKeys
 }
 
@@ -233,34 +233,34 @@ func SolveRollingXORCTR(data []byte, size int) []byte {
 }
 
 func Twenth() {
-    data, err := ioutil.ReadFile("20.txt")
-    if err != nil {
-        log.Fatal(err)
-    }
-    lines := strings.Split(string(data), "\n")
-    lines = lines[0:len(lines)-1]
-    cts := [][]byte{}
-    nonce := 0
+	data, err := ioutil.ReadFile("20.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	lines := strings.Split(string(data), "\n")
+	lines = lines[0 : len(lines)-1]
+	cts := [][]byte{}
+	nonce := 0
 	key := first.GenSingleByteSlice(byte(64), 16)
-    for _, line := range lines {
-        pt, _ := base64.StdEncoding.DecodeString(line)
-        ct := EncryptCTR(pt, key, uint64(nonce))
-        cts = append(cts, ct)
-    }
-    minLen := 0
-    for _, ct := range cts {
-        if ln := len(ct); minLen == 0 || ln < minLen {
-            minLen = ln
-        }
-    }
-    ciph := []byte{}
-    for _, ct := range cts {
-        ciph = append(ciph, ct[0:minLen]...)
-    }
-    key = SolveRollingXORCTR(ciph, minLen)
-    key[0] = byte(173)
-    for _, ct := range cts {
-        pt := first.XOR(ct, key)
-        fmt.Printf("%q\n", pt)
-    }
+	for _, line := range lines {
+		pt, _ := base64.StdEncoding.DecodeString(line)
+		ct := EncryptCTR(pt, key, uint64(nonce))
+		cts = append(cts, ct)
+	}
+	minLen := 0
+	for _, ct := range cts {
+		if ln := len(ct); minLen == 0 || ln < minLen {
+			minLen = ln
+		}
+	}
+	ciph := []byte{}
+	for _, ct := range cts {
+		ciph = append(ciph, ct[0:minLen]...)
+	}
+	key = SolveRollingXORCTR(ciph, minLen)
+	key[0] = byte(173)
+	for _, ct := range cts {
+		pt := first.XOR(ct, key)
+		fmt.Printf("%q\n", pt)
+	}
 }

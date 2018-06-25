@@ -20,11 +20,8 @@ func HexToBase64(src string) []byte {
 }
 
 func XOR(first []byte, second []byte) []byte {
-    if len(first) > len(second) {
+	if len(first) > len(second) {
 		first = first[:len(second)]
-	}
-	if len(first) != len(second) {
-		log.Fatal("XOR expects two equal length buffers")
 	}
 	res := make([]byte, len(first))
 	for i := 0; i < len(first); i++ {

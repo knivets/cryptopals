@@ -185,8 +185,8 @@ func Eighteenth() {
 	fmt.Printf("%q\n", pt)
 }
 
-func Nineteenth(){
-    third.BreakCTR()
+func Nineteenth() {
+	third.BreakCTR()
 }
 
 func main() {
