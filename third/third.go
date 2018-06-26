@@ -232,7 +232,50 @@ func SolveRollingXORCTR(data []byte, size int) []byte {
 	return key
 }
 
-func Twenth() {
+func BreakCTRsecond() {
+	data, err := ioutil.ReadFile("20.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	lines := strings.Split(string(data), "\n")
+	lines = lines[0 : len(lines)-1]
+	cts := [][]byte{}
+	nonce := 0
+	key := first.GenSingleByteSlice(byte(64), 16)
+	for _, line := range lines {
+		pt, _ := base64.StdEncoding.DecodeString(line)
+		ct := EncryptCTR(pt, key, uint64(nonce))
+		cts = append(cts, ct)
+	}
+	potKey := []byte{}
+	maxLen := getLongestSliceLen(cts)
+	for j := 0; j < maxLen; j++ {
+		var bt byte
+		score := 0
+		for i := 0; i < 256; i++ {
+			chars := []byte{}
+			for _, ct := range cts {
+				ln := len(ct)
+				if j <= (ln - 1) {
+					chars = append(chars, ct[j])
+				}
+			}
+			dec := first.XOR(chars, first.GenSingleByteSlice(byte(i), len(chars)))
+			curr := first.EnglishTextScore(dec)
+			if curr > score {
+				score = curr
+				bt = byte(i)
+			}
+		}
+		potKey = append(potKey, bt)
+	}
+	for _, ct := range cts {
+		pt := first.XOR(ct, potKey)
+		fmt.Printf("%q\n", pt)
+	}
+}
+
+func BreakCTRthird() {
 	data, err := ioutil.ReadFile("20.txt")
 	if err != nil {
 		log.Fatal(err)

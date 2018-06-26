@@ -189,6 +189,11 @@ func Nineteenth() {
 	third.BreakCTR()
 }
 
+func Twentieth() {
+	third.BreakCTRsecond()
+	third.BreakCTRthird()
+}
+
 func main() {
-	third.Twenth()
+	Twentieth()
 }
