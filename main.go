@@ -194,6 +194,11 @@ func Twentieth() {
 	third.BreakCTRthird()
 }
 
+func TwentyFirst() {
+	z := third.MT19937(5, 0)
+	fmt.Printf("%d\n", z)
+}
+
 func main() {
-	Twentieth()
+	TwentyFirst()
 }

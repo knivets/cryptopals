@@ -252,14 +252,14 @@ func BreakCTRsecond() {
 	for j := 0; j < maxLen; j++ {
 		var bt byte
 		score := 0
-		for i := 0; i < 256; i++ {
-			chars := []byte{}
-			for _, ct := range cts {
-				ln := len(ct)
-				if j <= (ln - 1) {
-					chars = append(chars, ct[j])
-				}
+		chars := []byte{}
+		for _, ct := range cts {
+			ln := len(ct)
+			if j <= (ln - 1) {
+				chars = append(chars, ct[j])
 			}
+		}
+		for i := 0; i < 256; i++ {
 			dec := first.XOR(chars, first.GenSingleByteSlice(byte(i), len(chars)))
 			curr := first.EnglishTextScore(dec)
 			if curr > score {
@@ -306,4 +306,54 @@ func BreakCTRthird() {
 		pt := first.XOR(ct, key)
 		fmt.Printf("%q\n", pt)
 	}
+}
+
+func MT19937Init(seed int) []uint32 {
+	state := []uint32{uint32(seed)}
+	for i := uint32(1); i < 624; i++ {
+		prev := state[len(state)-1]
+		elem := 0x6c078965*(prev^(prev>>30)) + i
+		state = append(state, uint32(elem))
+	}
+	return state
+}
+
+func MT19937Regenerate(state []uint32) {
+	for i := 0; i < 624; i++ {
+		y := state[i] & 0x80000000
+		y += state[(i+1)%624] & 0x7fffffff
+
+		z := state[(i+397)%624]
+		state[i] = z ^ (y >> 1)
+
+		if (y % 2) != 0 {
+			state[i] ^= 0x9908b0df
+		}
+	}
+}
+
+func MT19937Temper(y uint32) uint32 {
+	const _TEMPER_MASK_1 uint32 = 0x9d2c5680
+	const _TEMPER_MASK_2 uint32 = 0xefc60000
+	y ^= uint32(y >> 11)
+	y ^= uint32((y << 7) & _TEMPER_MASK_1)
+	y ^= uint32((y << 15) & _TEMPER_MASK_2)
+	y ^= uint32(y >> 18)
+	return y
+}
+
+func MT19937(num int, seed int) []uint32 {
+	res := []uint32{}
+	state := MT19937Init(seed)
+	index := len(state)
+	for len(res) < num {
+		if index >= len(state) {
+			MT19937Regenerate(state)
+			index = 0
+		}
+		el := MT19937Temper(state[index])
+		res = append(res, el)
+		index += 1
+	}
+	return res
 }
