@@ -203,6 +203,10 @@ func TwentySecond() {
 	third.MT19937CrackSeed()
 }
 
+func TwentyThird() {
+	third.CloneMT19937()
+}
+
 func main() {
-	TwentySecond()
+	TwentyThird()
 }

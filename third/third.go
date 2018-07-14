@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -352,6 +353,24 @@ func MT19937(num int, seed int) []uint32 {
 	return res
 }
 
+func MT19937FromSlice(num int, seedState []uint32) []uint32 {
+	res := []uint32{}
+	state := seedState
+	index := 0
+	for len(res) < num {
+		if index >= len(state) {
+			MT19937Regenerate(state)
+			index = 0
+		}
+		//fmt.Printf("state: %d\n", state[index])
+		el := MT19937Temper(state[index])
+		//fmt.Printf("tempered: %d\n", el)
+		res = append(res, el)
+		index += 1
+	}
+	return res
+}
+
 func MT19937Temper(y uint32) uint32 {
 	y ^= y >> 11
 	y ^= (y << 7) & 0x9d2c5680
@@ -442,4 +461,16 @@ func MT19937CrackSeed() {
 		}
 	}
 	fmt.Printf("discovered seed: %d\n", result)
+}
+
+func CloneMT19937() {
+	orig := MT19937(1248, 0)
+	state := []uint32{}
+	for _, num := range orig[0:624] {
+		res := MT19937Untemper(num)
+		state = append(state, res)
+	}
+	cloned := MT19937FromSlice(1248, state)
+	equal := reflect.DeepEqual(orig, cloned)
+	fmt.Println(equal)
 }
