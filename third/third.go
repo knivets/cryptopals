@@ -11,7 +11,9 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func CBCPaddingOracle(iv []byte, key []byte) []byte {
@@ -332,16 +334,6 @@ func MT19937Regenerate(state []uint32) {
 	}
 }
 
-func MT19937Temper(y uint32) uint32 {
-	const _TEMPER_MASK_1 uint32 = 0x9d2c5680
-	const _TEMPER_MASK_2 uint32 = 0xefc60000
-	y ^= uint32(y >> 11)
-	y ^= uint32((y << 7) & _TEMPER_MASK_1)
-	y ^= uint32((y << 15) & _TEMPER_MASK_2)
-	y ^= uint32(y >> 18)
-	return y
-}
-
 func MT19937(num int, seed int) []uint32 {
 	res := []uint32{}
 	state := MT19937Init(seed)
@@ -351,9 +343,103 @@ func MT19937(num int, seed int) []uint32 {
 			MT19937Regenerate(state)
 			index = 0
 		}
+		//fmt.Printf("state: %d\n", state[index])
 		el := MT19937Temper(state[index])
+		//fmt.Printf("tempered: %d\n", el)
 		res = append(res, el)
 		index += 1
 	}
 	return res
+}
+
+func MT19937Temper(y uint32) uint32 {
+	y ^= y >> 11
+	y ^= (y << 7) & 0x9d2c5680
+	y ^= (y << 15) & 0xefc60000
+	y ^= y >> 18
+	return y
+}
+
+func MT19937Untemper(y uint32) uint32 {
+	y = reverseRightShiftXor(y, 18)
+	y = reverseFirstOp(y)
+	y = reverseSecondOp(y)
+	y = reverseRightShiftXor(y, 11)
+	return y
+}
+
+func reverseRightShiftXor(y uint32, nm int) uint32 {
+	iters := uint32(math.Ceil(float64(32) / float64(nm)))
+	num := uint32(nm)
+	binStr := strings.Repeat("1", int(num))
+	mskInt, _ := strconv.ParseInt(binStr, 2, 32)
+	mask := uint32(mskInt)
+
+	res := uint32(0)
+	msk := mask << (32 - num)
+	res = y & msk
+	for i := uint32(1); i < iters; i++ {
+		maskShift := (32 - ((i + 1) * num))
+		if maskShift >= 32 {
+			maskShift = 0
+		}
+		msk := mask << maskShift
+		rec := ((res >> num) ^ y)
+		rs := rec & msk
+		res |= rs
+	}
+	return res
+}
+
+func reverseSecondOp(y uint32) uint32 {
+	binStr := strings.Repeat("1", 7)
+	mskInt, _ := strconv.ParseInt(binStr, 2, 32)
+	mask := uint32(mskInt)
+	msk := uint32(0x9d2c5680)
+	res := uint32(0)
+	res |= y & mask
+	res |= (y ^ ((res << 7) & msk)) & (mask << 7)
+	res |= (y ^ ((res << 7) & msk)) & (mask << 14)
+	res |= (y ^ ((res << 7) & msk)) & (mask << 21)
+	res |= (y ^ ((res << 7) & msk)) & (mask << 25)
+	return res
+}
+
+func reverseFirstOp(y uint32) uint32 {
+	binStr := strings.Repeat("1", 15)
+	mskInt, _ := strconv.ParseInt(binStr, 2, 32)
+	mask := uint32(mskInt)
+	msk := uint32(0xefc60000)
+	res := uint32(0)
+	res |= y & mask
+	res |= (y ^ ((res << 15) & msk)) & (mask << 15)
+	res |= (y ^ ((res << 15) & msk)) & (mask << 17)
+	return res
+}
+
+func secondsToMiliSecs(sec int) int {
+	return int(time.Duration(sec) * time.Second)
+}
+
+func MT19937CrackSeed() {
+	sec := 40 + second.GenRandomNum(50)
+	time.Sleep(time.Duration(secondsToMiliSecs(sec)))
+	now := time.Now()
+	seed := int(now.Unix())
+	fmt.Printf("hidden seed: %d\n", seed)
+	num := MT19937(1, seed)
+
+	sec = 40 + second.GenRandomNum(30)
+	time.Sleep(time.Duration(secondsToMiliSecs(sec)))
+	later := time.Now()
+	var result int
+	for i := 0; i <= secondsToMiliSecs(1000); i++ {
+		potSeed := int(later.Unix()) - i
+		cand := MT19937(1, potSeed)
+		if cand[0] == num[0] {
+			result = potSeed
+			break
+		}
+	}
+	fmt.Printf("discovered seed: %d\n", result)
 }

@@ -397,8 +397,8 @@ func userDataEncodeCBC(data string, iv []byte, key []byte) []byte {
 func userDataDecodeCBC(ciph []byte, iv []byte, key []byte) bool {
 	admin := false
 	pt := DecryptCBC(ciph, iv, key)
+	pt, _ = StripPkcs7(pt)
 	fmt.Printf("%q\n", pt)
-	//pt, _ = StripPkcs7(pt)
 	kvs := [][]string{}
 	pairs := strings.Split(string(pt), ";")
 	for _, pair := range pairs {

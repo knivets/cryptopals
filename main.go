@@ -199,6 +199,10 @@ func TwentyFirst() {
 	fmt.Printf("%d\n", z)
 }
 
+func TwentySecond() {
+	third.MT19937CrackSeed()
+}
+
 func main() {
-	TwentyFirst()
+	TwentySecond()
 }
