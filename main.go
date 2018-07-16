@@ -208,5 +208,5 @@ func TwentyThird() {
 }
 
 func main() {
-	TwentyThird()
+	third.TwentyFourth()
 }

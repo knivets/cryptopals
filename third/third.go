@@ -311,8 +311,8 @@ func BreakCTRthird() {
 	}
 }
 
-func MT19937Init(seed int) []uint32 {
-	state := []uint32{uint32(seed)}
+func MT19937Init(seed uint32) []uint32 {
+	state := []uint32{seed}
 	for i := uint32(1); i < 624; i++ {
 		prev := state[len(state)-1]
 		elem := 0x6c078965*(prev^(prev>>30)) + i
@@ -335,7 +335,7 @@ func MT19937Regenerate(state []uint32) {
 	}
 }
 
-func MT19937(num int, seed int) []uint32 {
+func MT19937(num int, seed uint32) []uint32 {
 	res := []uint32{}
 	state := MT19937Init(seed)
 	index := len(state)
@@ -444,16 +444,16 @@ func MT19937CrackSeed() {
 	sec := 40 + second.GenRandomNum(50)
 	time.Sleep(time.Duration(secondsToMiliSecs(sec)))
 	now := time.Now()
-	seed := int(now.Unix())
+	seed := uint32(now.Unix())
 	fmt.Printf("hidden seed: %d\n", seed)
 	num := MT19937(1, seed)
 
 	sec = 40 + second.GenRandomNum(30)
 	time.Sleep(time.Duration(secondsToMiliSecs(sec)))
 	later := time.Now()
-	var result int
+	var result uint32
 	for i := 0; i <= secondsToMiliSecs(1000); i++ {
-		potSeed := int(later.Unix()) - i
+		potSeed := uint32(later.Unix()) - uint32(i)
 		cand := MT19937(1, potSeed)
 		if cand[0] == num[0] {
 			result = potSeed
@@ -473,4 +473,92 @@ func CloneMT19937() {
 	cloned := MT19937FromSlice(1248, state)
 	equal := reflect.DeepEqual(orig, cloned)
 	fmt.Println(equal)
+}
+
+func MT19937Encrypt(pt []byte, key uint16) []byte {
+	numbers := MT19937(len(pt), uint32(key))
+	keystream := []byte{}
+	for _, number := range numbers {
+		keystream = append(keystream, byte(number))
+	}
+
+	return first.XOR(pt, keystream)
+}
+
+func MT19937Decrypt(ct []byte, key uint16) []byte {
+	return MT19937Encrypt(ct, key)
+}
+
+func isPasswordTokenUnsecure(token []byte) bool {
+	unsecure := false
+	now := uint32(time.Now().Unix())
+	hour := uint32(secondsToMiliSecs(3600))
+
+	for i := uint32(0); i < hour; i++ {
+		potSeed := now - i
+		numbers := MT19937(10, potSeed)
+		potToken := []byte{}
+		for _, num := range numbers {
+			potToken = append(potToken, byte(num))
+		}
+		unsecure = reflect.DeepEqual(potToken, token)
+		if unsecure == true {
+			break
+		}
+	}
+	return unsecure
+}
+
+func TwentyFourth() {
+	num := second.GenRandomNum(15)
+	data := []byte{}
+	for i := 0; i < num; i++ {
+		chr := 65 + second.GenRandomNum(57)
+		data = append(data, byte(chr))
+	}
+	data = append(data, first.GenSingleByteSlice(byte('A'), 14)...)
+	seed := second.GenRandomNum(10000)
+	ct := MT19937Encrypt(data, uint16(seed))
+	for i := 0; i <= 65536; i++ {
+		potSeed := uint32(i)
+		numbers := MT19937(len(ct), potSeed)
+		bts := []byte{}
+		for _, num := range numbers {
+			bts = append(bts, byte(num))
+		}
+		res := first.XOR(bts, ct)
+		expectedPt := first.GenSingleByteSlice(byte('A'), 14)
+		equal := false
+		for j := 0; j < len(res); j++ {
+			ptIndex := len(expectedPt) - (j + 1)
+			if ptIndex >= 0 {
+				resEl := res[len(res)-(j+1)]
+				ptEl := expectedPt[ptIndex]
+				if ptEl != resEl {
+					break
+				} else {
+					if ptIndex == 0 {
+						equal = true
+					}
+				}
+			}
+		}
+		if equal == true {
+			pt := MT19937Decrypt(ct, uint16(potSeed))
+			fmt.Printf("secret seed is: %d\n", seed)
+			fmt.Printf("secret pt is: %s\n", data)
+			fmt.Printf("discovered seed is: %d\n", potSeed)
+			fmt.Printf("discovered pt is: %s\n", pt)
+		}
+	}
+
+	// part 2 of the ex
+	now := time.Now().Unix()
+	numbers := MT19937(10, uint32(now))
+	token := []byte{}
+	for _, num := range numbers {
+		token = append(token, byte(num))
+	}
+	unsecure := isPasswordTokenUnsecure(token)
+	fmt.Printf("is token a MT seeded with current time? %t\n", unsecure)
 }
