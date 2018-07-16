@@ -562,34 +562,3 @@ func CrackMTStreamCipher() {
 	unsecure := isPasswordTokenUnsecure(token)
 	fmt.Printf("is token a MT seeded with current time? %t\n", unsecure)
 }
-
-func EditCTRCiphertext(ct []byte,
-	key []byte, nonce uint64, offset int, newtext byte) []byte {
-	pt := DecryptCTR(ct, key, nonce)
-	pt[offset] = newtext
-	newCt := EncryptCTR(pt, key, nonce)
-	return newCt
-}
-
-var CTRSharedKey []byte = first.GenSingleByteSlice(byte(10), 16)
-var CTRSharedNonce uint64 = 0
-
-func EditCTRAPICall(ct []byte, offset int, newtext byte) []byte {
-	ct = EditCTRCiphertext(ct, CTRSharedKey, CTRSharedNonce, offset, newtext)
-	return ct
-}
-
-func GetCTRPlaintext(ct []byte) []byte {
-	pt := []byte{}
-	for i := 0; i < len(ct); i++ {
-		old := ct[i]
-		for j := 0; j <= 256; j++ {
-			tmpCt := EditCTRAPICall(ct, i, byte(j))
-			if tmpCt[i] == old {
-				pt = append(pt, byte(j))
-				break
-			}
-		}
-	}
-	return pt
-}

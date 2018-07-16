@@ -2,6 +2,7 @@ package main
 
 import (
 	"cryptopals/first"
+	"cryptopals/fourth"
 	"cryptopals/second"
 	"cryptopals/third"
 	"encoding/base64"
@@ -219,11 +220,15 @@ func TwentyFifth() {
 	oldKey := []byte("YELLOW SUBMARINE")
 	ciph, _ := base64.StdEncoding.DecodeString(string(data))
 	pt := first.DecryptECB(ciph, oldKey)
-	ct := third.EncryptCTR(pt, third.CTRSharedKey, third.CTRSharedNonce)
-	recoveredPt := third.GetCTRPlaintext(ct)
+	ct := third.EncryptCTR(pt, fourth.CTRSharedKey, fourth.CTRSharedNonce)
+	recoveredPt := fourth.GetCTRPlaintext(ct)
 	fmt.Printf("%s\n", string(recoveredPt))
 }
 
+func TwentySixth() {
+	fourth.RewriteCTR()
+}
+
 func main() {
-	TwentyFifth()
+	TwentySixth()
 }
