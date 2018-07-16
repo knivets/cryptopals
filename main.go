@@ -207,6 +207,23 @@ func TwentyThird() {
 	third.CloneMT19937()
 }
 
+func TwentyFourth() {
+	third.CrackMTStreamCipher()
+}
+
+func TwentyFifth() {
+	data, err := ioutil.ReadFile("25.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	oldKey := []byte("YELLOW SUBMARINE")
+	ciph, _ := base64.StdEncoding.DecodeString(string(data))
+	pt := first.DecryptECB(ciph, oldKey)
+	ct := third.EncryptCTR(pt, third.CTRSharedKey, third.CTRSharedNonce)
+	recoveredPt := third.GetCTRPlaintext(ct)
+	fmt.Printf("%s\n", string(recoveredPt))
+}
+
 func main() {
-	third.TwentyFourth()
+	TwentyFifth()
 }
