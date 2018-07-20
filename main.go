@@ -229,6 +229,10 @@ func TwentySixth() {
 	fourth.RewriteCTR()
 }
 
+func TwentySeventh() {
+	fourth.ExtractKeyFromCBCIV()
+}
+
 func main() {
-	TwentySixth()
+	TwentySeventh()
 }

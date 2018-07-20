@@ -381,7 +381,7 @@ func StripPkcs7(data []byte) ([]byte, error) {
 	}
 }
 
-func userDataEncodeCBC(data string, iv []byte, key []byte) []byte {
+func UserDataEncodeCBC(data string, iv []byte, key []byte) []byte {
 	prefix := "comment1=cooking%20MCs;userdata="
 	suffix := ";comment2=%20like%20a%20pound%20of%20bacon"
 
@@ -422,7 +422,7 @@ func RewriteCBC() {
 	iv := first.GenSingleByteSlice(byte(64), 16)
 	in := first.GenSingleByteSlice(byte('a'), 33)
 	in = append(in, []byte("adminttrue")...)
-	res := userDataEncodeCBC(string(in), iv, key)
+	res := UserDataEncodeCBC(string(in), iv, key)
 	res[48] = byte(60)
 	res[54] = byte(254)
 	admin := userDataDecodeCBC(res, iv, key)
