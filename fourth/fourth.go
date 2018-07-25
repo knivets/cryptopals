@@ -3,6 +3,7 @@ package fourth
 import (
 	"cryptopals/first"
 	"cryptopals/second"
+	"cryptopals/sha1"
 	"cryptopals/third"
 	"fmt"
 	"strings"
@@ -146,4 +147,8 @@ func ExtractKeyFromCBCIV() {
 		iv := first.XOR(frst, scnd)
 		fmt.Printf("the IV is: %q\n", iv)
 	}
+}
+
+func Sha1mac(mes, key []byte) [20]byte {
+	return sha1.Sum(append(key, mes...))
 }

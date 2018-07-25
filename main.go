@@ -233,6 +233,11 @@ func TwentySeventh() {
 	fourth.ExtractKeyFromCBCIV()
 }
 
+func TwentyEigth() {
+	res := fourth.Sha1mac([]byte("hello"), []byte("yellow"))
+	fmt.Printf("the sha1 mac is: %x\n", res)
+}
+
 func main() {
-	TwentySeventh()
+	TwentyEigth()
 }
