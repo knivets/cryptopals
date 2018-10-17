@@ -2,10 +2,12 @@ package fourth
 
 import (
 	"cryptopals/first"
+	"cryptopals/md4"
 	"cryptopals/second"
 	"cryptopals/sha1"
 	"cryptopals/third"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -151,4 +153,100 @@ func ExtractKeyFromCBCIV() {
 
 func Sha1mac(mes, key []byte) [20]byte {
 	return sha1.Sum(append(key, mes...))
+}
+
+func genSHA1Padding(ln uint64) []byte {
+	res := []byte{}
+	// Padding.  Add a 1 bit and 0 bits until 56 bytes mod 64.
+	var tmp [64]byte
+	tmp[0] = 0x80
+	if ln%64 < 56 {
+		res = append(res, tmp[0:56-ln%64]...)
+	} else {
+		//d.Write(tmp[0 : 64+56-len%64])
+		res = append(res, tmp[0:64+56-ln%64]...)
+	}
+
+	// Length in bits.
+	ln <<= 3
+	sha1.PutUint64(tmp[:], ln)
+	res = append(res, tmp[0:8]...)
+	return res
+}
+
+var MacSecret []byte = []byte("secret")
+
+func verifySHA1MAC(msg, sign []byte) bool {
+	mac := Sha1mac(msg, MacSecret)
+	return reflect.DeepEqual(mac[:], sign)
+}
+
+func getPrevBlockSize(ln uint64) uint64 {
+	// rounding to the nearest 64 because the rest of the space
+	// will be filled with padding up until 512 bits
+	// adding 8 because 56+8 = 64, at which point we need to round
+	// because 55 bytes is the last length which allows us to fit
+	// the message into 512 block (55*8+8=448), which leaves space
+	// only for the 64 bit message length
+	return (ln + 64 + 8) &^ (64 - 1)
+}
+
+func ForgeSHA1(msg, orig, ext []byte) ([]byte, []byte) {
+	h := [5]uint32{}
+	_, h[0] = sha1.ConsumeUint32(orig[0:4])
+	_, h[1] = sha1.ConsumeUint32(orig[4:8])
+	_, h[2] = sha1.ConsumeUint32(orig[8:12])
+	_, h[3] = sha1.ConsumeUint32(orig[12:16])
+	_, h[4] = sha1.ConsumeUint32(orig[16:20])
+	var forgedMsg []byte
+	var forged [20]byte
+	maxKeySize := 200
+	for i := 0; i < maxKeySize; i++ {
+		potLen := uint64(len(msg) + i)
+		padGuess := genSHA1Padding(potLen)
+		payload := append(padGuess, ext...)
+		forgedMsg = append(msg, payload...)
+		finLen := getPrevBlockSize(potLen)
+
+		forged = sha1.CustomSHA1(h, ext, finLen)
+
+		if verifySHA1MAC(forgedMsg, forged[:]) {
+			return forgedMsg, forged[:]
+		}
+	}
+	return []byte{}, []byte{}
+}
+
+func MD4Mac(mes, key []byte) []byte {
+	return md4.Sum(append(key, mes...))
+}
+
+func verifyMD4MAC(msg, sign []byte) bool {
+	mac := MD4Mac(msg, MacSecret)
+	return reflect.DeepEqual(mac, sign)
+}
+
+func ForgeMD4(msg, orig, ext []byte) ([]byte, []byte) {
+	h := [4]uint32{}
+	_, h[0] = sha1.ConsumeUint32(orig[0:4])
+	_, h[1] = sha1.ConsumeUint32(orig[4:8])
+	_, h[2] = sha1.ConsumeUint32(orig[8:12])
+	_, h[3] = sha1.ConsumeUint32(orig[12:16])
+	var forgedMsg []byte
+	var forged []byte
+	maxKeySize := 64
+	for i := 0; i < maxKeySize; i++ {
+		potLen := uint64(len(msg) + i)
+		padGuess := genSHA1Padding(potLen)
+		payload := append(padGuess, ext...)
+		forgedMsg = append(msg, payload...)
+		finLen := getPrevBlockSize(potLen)
+
+		forged = md4.CustomMD4(h, ext, finLen)
+
+		if verifyMD4MAC(forgedMsg, forged) {
+			return forgedMsg, forged
+		}
+	}
+	return []byte{}, []byte{}
 }

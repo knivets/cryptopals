@@ -238,6 +238,26 @@ func TwentyEigth() {
 	fmt.Printf("the sha1 mac is: %x\n", res)
 }
 
+func TwentyNinth() {
+	msg := []byte("comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon")
+	mac := fourth.Sha1mac(msg, fourth.MacSecret)
+
+	admin := []byte(";admin=true")
+	pt, hsh := fourth.ForgeSHA1(msg, mac[:], admin)
+	fmt.Printf("%s\n", pt)
+	fmt.Printf("%x\n", hsh)
+}
+
+func Thirtieth() {
+	msg := []byte("comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon")
+	mac := fourth.MD4Mac(msg, fourth.MacSecret)
+
+	admin := []byte(";admin=true")
+	pt, hsh := fourth.ForgeMD4(msg, mac, admin)
+	fmt.Printf("%s\n", pt)
+	fmt.Printf("%x\n", hsh)
+}
+
 func main() {
-	TwentyEigth()
+	Thirtieth()
 }
