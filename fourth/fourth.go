@@ -6,9 +6,15 @@ import (
 	"cryptopals/second"
 	"cryptopals/sha1"
 	"cryptopals/third"
+	"encoding/hex"
 	"fmt"
+	"log"
+	"net/http"
+	"net/url"
 	"reflect"
+	"sort"
 	"strings"
+	"time"
 )
 
 func EditCTRCiphertext(ct []byte,
@@ -249,4 +255,201 @@ func ForgeMD4(msg, orig, ext []byte) ([]byte, []byte) {
 		}
 	}
 	return []byte{}, []byte{}
+}
+
+func HMACSHA1(msg, secret []byte) []byte {
+	blockSize := 64
+	key := secret
+	if len(key) > blockSize {
+		hsh := sha1.Sum(secret)
+		key = hsh[:]
+	}
+	if len(key) < blockSize {
+		for len(key) < blockSize {
+			key = append(key, byte(0))
+		}
+	}
+	oPad := first.XOR(key, first.GenSingleByteSlice(byte(0x5c), blockSize))
+	iPad := first.XOR(key, first.GenSingleByteSlice(byte(0x36), blockSize))
+	inner := sha1.Sum(append(iPad, msg...))
+	res := sha1.Sum(append(oPad, inner[:]...))
+	return res[:]
+}
+
+func insecureCompare(first, second []byte) bool {
+	if len(first) != len(second) {
+		return false
+	}
+	for i := 0; i < len(first); i++ {
+		if first[i] != second[i] {
+			return false
+		}
+		time.Sleep(1 * time.Millisecond)
+	}
+	return true
+}
+
+func ValidateSignatureServer() {
+	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusBadRequest
+		args := r.URL.Query()
+		file := args["file"]
+		signature := args["signature"]
+		if len(file) > 0 && len(signature) > 0 {
+			fl := []byte(file[0])
+			sig, _ := hex.DecodeString(signature[0])
+			hmac := HMACSHA1(fl, MacSecret)
+			res := insecureCompare(hmac, sig)
+			if res {
+				status = http.StatusOK
+			} else {
+				status = http.StatusInternalServerError
+			}
+			fmt.Printf("file: %x; signature: %x; res: %t\n", fl, sig, res)
+		}
+		w.WriteHeader(status)
+	})
+
+	log.Fatal(http.ListenAndServe(":9000", nil))
+}
+
+func signatureClient(url string) bool {
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 200 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func buildUrl(file string, sig []byte) string {
+	hex := hex.EncodeToString(sig)
+	u, err := url.Parse("http://localhost:9000/test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	q := u.Query()
+	q.Set("file", file)
+	q.Set("signature", hex)
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+type ByteTime struct {
+	bt  byte
+	dur int
+}
+
+func getByteCands(file string, hsh []byte, j int) []ByteTime {
+	res := []ByteTime{}
+	for i := 0; i < 256; i++ {
+		in := append([]byte{}, hsh...)
+		in[j] = byte(i)
+		url := buildUrl(file, in)
+		start := time.Now()
+		status := signatureClient(url)
+		fin := time.Now()
+		// this works for 2 ms delay
+		//elapsed := int(fin.Sub(start) / time.Millisecond)
+		elapsed := int(fin.Sub(start) / time.Microsecond)
+		if status {
+			// make sure that correct last byte will be selected
+			elapsed = int(time.Duration(1) * time.Minute)
+		}
+		res = append(res, ByteTime{bt: byte(i), dur: elapsed})
+	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].dur > res[j].dur
+	})
+
+	return res[0:3]
+}
+
+func getCandDur(data []ByteTime) []int {
+	fin := []int{}
+	for i := 0; i < len(data); i++ {
+		fin = append(fin, data[i].dur)
+	}
+	return fin
+}
+
+func mean(data []int) float64 {
+	sum := 0
+	for _, item := range data {
+		sum += item
+	}
+	return float64(sum) / float64(len(data))
+}
+
+func resetBuff(buff, res []byte) []byte {
+	buff = make([]byte, 20)
+	for k := 0; k < len(res); k++ {
+		buff[k] = res[k]
+	}
+	return buff
+}
+
+func PickSignature(file string) []byte {
+	//this works for 2 ms delay
+	//treshold := 1
+	treshold := float64(1000)
+	buff := make([]byte, 20)
+	res := []byte{}
+	backup := 0
+	lastTiming := float64(0)
+	for i := 0; i < 20; i++ {
+		restart := false
+		cand := getByteCands(file, buff, i)
+		bt := cand[0].bt
+		buff[i] = bt
+		if i == 19 {
+			url := buildUrl(file, buff)
+			status := signatureClient(url)
+			if !status {
+				restart = true
+			} else {
+				res = append(res, bt)
+				break
+			}
+		}
+		mn := mean(getCandDur(cand))
+		//fmt.Printf("%d %f %f %d\n", getCandDur(cand), mn, lastTiming, int(mn-lastTiming))
+		if (mn - lastTiming) < treshold {
+			restart = true
+			lastTiming = 0
+		} else {
+			lastTiming = mn
+		}
+		if restart {
+			if i >= 3 {
+				i = i - 3
+			} else {
+				i = -1
+			}
+			if backup > 0 && backup > i {
+				i = backup - 2
+			}
+			k := i + 1
+			if k > len(res) {
+				k = len(res) - 1
+			} else if len(res) == 0 {
+				k = 0
+			}
+			res = res[:k]
+			buff = resetBuff(buff, res)
+			if backup < k {
+				backup = k - 1
+			}
+			fmt.Printf("restarting %d\n", i)
+		}
+		if !restart {
+			res = append(res, bt)
+		}
+	}
+	return res
 }

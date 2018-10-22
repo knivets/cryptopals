@@ -259,5 +259,7 @@ func Thirtieth() {
 }
 
 func main() {
-	Thirtieth()
+	go fourth.ValidateSignatureServer()
+	sig := fourth.PickSignature("file")
+	fmt.Printf("discovered signature: %x\n", sig)
 }
