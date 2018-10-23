@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cryptopals/fifth"
 	"cryptopals/first"
 	"cryptopals/fourth"
 	"cryptopals/second"
@@ -258,8 +259,19 @@ func Thirtieth() {
 	fmt.Printf("%x\n", hsh)
 }
 
-func main() {
+func ThirtySecond() {
 	go fourth.ValidateSignatureServer()
 	sig := fourth.PickSignature("file")
 	fmt.Printf("discovered signature: %x\n", sig)
+}
+
+func ThirtyThird() {
+	int64key := fifth.ToyDH()
+	key := fifth.DH()
+	fmt.Printf("int64 key: %d\n", int64key)
+	fmt.Printf("key: %d\n", key)
+}
+
+func main() {
+	ThirtyThird()
 }
