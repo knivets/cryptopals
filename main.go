@@ -272,6 +272,10 @@ func ThirtyThird() {
 	fmt.Printf("key: %d\n", key)
 }
 
+func ThirtyFourth() {
+	fifth.ThirtyFourth()
+}
+
 func main() {
-	ThirtyThird()
+	ThirtyFourth()
 }

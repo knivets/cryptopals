@@ -1,12 +1,42 @@
 package fifth
 
 import (
+	"bytes"
 	"crypto/rand"
+	"cryptopals/second"
+	"cryptopals/sha1"
+	"encoding/binary"
 	"encoding/hex"
-	_ "fmt"
+	"fmt"
 	"math"
 	"math/big"
 )
+
+var DHp *big.Int
+var DHg *big.Int
+var alice string = "00:0a:95:9d:68:16"
+var bob string = "00:0a:95:9d:68:17"
+var eve string = "00:0a:95:9d:68:18"
+var names map[string]string
+var aliceState map[string]interface{}
+var bobState map[string]interface{}
+var eveState map[string]interface{}
+var eveBobState map[string]interface{}
+
+func init() {
+	DHpSlice, _ := hex.DecodeString(
+		`ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a637ed6b0bff5cb6f406b7edee386bfb5a899fa5ae9f24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed529077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff`)
+	DHp = new(big.Int).SetBytes(DHpSlice)
+	DHg = big.NewInt(2)
+	aliceState = make(map[string]interface{})
+	bobState = make(map[string]interface{})
+	eveState = make(map[string]interface{})
+	eveBobState = make(map[string]interface{})
+	names = make(map[string]string)
+	names[alice] = "alice"
+	names[bob] = "bob"
+	names[eve] = "eve"
+}
 
 func ExpInt64(a, b, p int64) int64 {
 	c := new(big.Int).Exp(big.NewInt(a), big.NewInt(b), big.NewInt(p))
@@ -44,20 +74,302 @@ func ToyDH() int64 {
 }
 
 func DH() *big.Int {
-	pSlice, _ := hex.DecodeString(
-		`ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a637ed6b0bff5cb6f406b7edee386bfb5a899fa5ae9f24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed529077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff`)
-	p := new(big.Int).SetBytes(pSlice)
-	g := big.NewInt(2)
 	a := GenRandomInt(math.MaxInt64)
-	a.Mod(a, p)
+	a.Mod(a, DHp)
 	b := GenRandomInt(math.MaxInt64)
-	b.Mod(b, p)
-	A := ExpInt(g, a, p)
-	B := ExpInt(g, b, p)
-	s1 := ExpInt(B, a, p)
-	s2 := ExpInt(A, b, p)
+	b.Mod(b, DHp)
+	A := ExpInt(DHg, a, DHp)
+	B := ExpInt(DHg, b, DHp)
+	s1 := ExpInt(B, a, DHp)
+	s2 := ExpInt(A, b, DHp)
 	if s1.Cmp(s2) != 0 {
 		panic("numbers are not equal")
 	}
 	return s1
+}
+
+func bytesToInt32(data []byte) int32 {
+	var res int32
+	buff := bytes.NewReader(data)
+	_ = binary.Read(buff, binary.LittleEndian, &res)
+	return res
+}
+
+func int32ToBytes(num int32) []byte {
+	buff := new(bytes.Buffer)
+	_ = binary.Write(buff, binary.LittleEndian, num)
+	return buff.Bytes()
+}
+
+func parseMeta(payload []byte) (string, string, int) {
+	if len(payload) <= 35 {
+		panic("incorrect msg")
+	}
+	src := string(payload[0:17])
+	dst := string(payload[17:34])
+	op := int(payload[34:35][0])
+
+	return src, dst, op
+}
+
+func produceMeta(src, dst string, op int) []byte {
+	payload := []byte(src)
+	payload = append(payload, []byte(dst)...)
+	payload = append(payload, byte(op))
+
+	return payload
+}
+
+func swtch(payload []byte) {
+	_, dst, _ := parseMeta(payload)
+	hosts := map[string]func([]byte){
+		alice: Alice,
+		bob:   Bob,
+		eve:   Eve,
+	}
+	if host, ok := hosts[dst]; ok {
+		host(payload)
+	}
+}
+
+func encodeBigNums(data ...*big.Int) []byte {
+	buff := [][]byte{}
+	for _, item := range data {
+		buff = append(buff, item.Bytes())
+	}
+	return encodeBytes(buff...)
+}
+
+func encodeBytes(data ...[]byte) []byte {
+	res := []byte{}
+	for _, item := range data {
+		ln := int32ToBytes(int32(len(item)))
+		res = append(res, ln...)
+	}
+	for _, item := range data {
+		res = append(res, item...)
+	}
+	return res
+}
+
+func decodeByteSlices(data []byte, num int) [][]byte {
+	res := [][]byte{}
+	size := 4
+	offset := int32(size * num)
+	for i := 0; i < num; i++ {
+		ln := bytesToInt32(data[i*size : (i+1)*size])
+		res = append(res, data[offset:offset+ln])
+		offset += ln
+	}
+	return res
+}
+
+func decodeBigNums(data []byte, num int) []*big.Int {
+	res := []*big.Int{}
+	bts := decodeByteSlices(data, num)
+	for _, item := range bts {
+		digit := new(big.Int).SetBytes(item)
+		res = append(res, digit)
+	}
+	return res
+}
+
+func deriveKey(s *big.Int) []byte {
+	dig := sha1.Sum(s.Bytes())
+	return dig[0:16]
+}
+
+func BN(data interface{}) *big.Int {
+	num, _ := data.(*big.Int)
+	return num
+}
+
+func padAndEncryptCBC(msg []byte, s *big.Int) ([]byte, []byte) {
+	key := deriveKey(s)
+	msg = second.Pkcs7(msg, 16)
+	iv := ExpInt(big.NewInt(7), GenRandomInt(math.MaxInt64), DHp).Bytes()[0:16]
+	ct := second.EncryptCBC(msg, iv, key)
+	return ct, iv
+}
+
+func decryptCBCAndStripPad(ct, iv []byte, s *big.Int) []byte {
+	key := deriveKey(s)
+	pt := second.DecryptCBC(ct, iv, key)
+	pt, _ = second.StripPkcs7(pt)
+	return pt
+}
+
+func genPrivKey(p *big.Int) *big.Int {
+	a := GenRandomInt(math.MaxInt64)
+	return a.Mod(a, p)
+}
+
+func wrapMsg(src, dst string, op int, payload []byte) []byte {
+	res := produceMeta(src, dst, op)
+	return append(res, payload...)
+}
+
+func msgTypeFirst(src, dst string, data []byte, state map[string]interface{}) []byte {
+	p := DHp
+	g := DHg
+	a := genPrivKey(p)
+	state["a"] = a
+	state["p"] = p
+	A := ExpInt(g, a, p)
+
+	encoded := encodeBigNums(p, g, A)
+	payload := wrapMsg(src, dst, 1, encoded)
+
+	return payload
+}
+
+func msgTypeSecond(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=1\n", names[dst])
+	digits := decodeBigNums(payload, 3)
+	p := digits[0]
+	g := digits[1]
+	A := digits[2]
+	state["p"] = p
+	state["g"] = g
+	state["A"] = A
+
+	b := genPrivKey(p)
+	state["b"] = b
+	B := ExpInt(g, b, p)
+
+	encoded := encodeBigNums(B)
+	reply := wrapMsg(dst, src, 2, encoded)
+
+	return reply
+}
+
+func msgTypeThird(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=2\n", names[dst])
+	digits := decodeBigNums(payload, 1)
+	B := digits[0]
+	a := BN(state["a"])
+	p := BN(state["p"])
+
+	s := ExpInt(B, a, p)
+	state["s"] = s
+	msg := []byte("hello world")
+	ct, iv := padAndEncryptCBC(msg, s)
+
+	encoded := encodeBytes(ct, iv)
+	reply := wrapMsg(dst, src, 3, encoded)
+
+	return reply
+}
+
+func msgTypeFourth(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=3\n", names[dst])
+	b := BN(state["b"])
+	p := BN(state["p"])
+	A := BN(state["A"])
+	decoded := decodeByteSlices(payload, 2)
+	ct := decoded[0]
+	iv := decoded[1]
+
+	s := ExpInt(A, b, p)
+	state["s"] = s
+	pt := decryptCBCAndStripPad(ct, iv, s)
+	// reencrypting
+	ct, iv = padAndEncryptCBC(pt, s)
+
+	encoded := encodeBytes(ct, iv)
+	reply := wrapMsg(dst, src, 4, encoded)
+
+	return reply
+}
+
+func msgTypeFifth(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=4\n", names[dst])
+	s := BN(state["s"])
+	decoded := decodeByteSlices(payload, 2)
+	ct := decoded[0]
+	iv := decoded[1]
+
+	pt := decryptCBCAndStripPad(ct, iv, s)
+	fmt.Printf("%s received a message from %s: \"%v\"\n", names[dst], names[src], string(pt))
+
+	return []byte{}
+}
+
+func Alice(payload []byte) {
+	src, dst, op := parseMeta(payload)
+	payload = payload[35:]
+	state := aliceState
+	if op == 1 {
+		reply := msgTypeSecond(src, dst, payload, state)
+		swtch(reply)
+	} else if op == 2 {
+		reply := msgTypeThird(src, dst, payload, state)
+		swtch(reply)
+	} else if op == 3 {
+		reply := msgTypeFourth(src, dst, payload, state)
+		swtch(reply)
+	} else if op == 4 {
+		msgTypeFifth(src, dst, payload, state)
+	}
+}
+
+func Bob(payload []byte) {
+	src, dst, op := parseMeta(payload)
+	payload = payload[35:]
+	state := bobState
+	if op == 1 {
+		reply := msgTypeSecond(src, dst, payload, state)
+		swtch(reply)
+	} else if op == 2 {
+		reply := msgTypeThird(src, dst, payload, state)
+		swtch(reply)
+	} else if op == 3 {
+		reply := msgTypeFourth(src, dst, payload, state)
+		swtch(reply)
+	} else if op == 4 {
+		msgTypeFifth(src, dst, payload, state)
+	}
+}
+
+func Eve(payload []byte) {
+	src, dst, op := parseMeta(payload)
+	payload = payload[35:]
+	fmt.Printf("%s received op=%d\n", names[dst], op)
+	newDst := ""
+	if src == alice {
+		newDst = bob
+	} else {
+		newDst = alice
+	}
+	state := eveState
+	if op == 1 {
+		digits := decodeBigNums(payload, 3)
+		p := digits[0]
+		g := digits[1]
+		state["p"] = p
+		encoded := encodeBigNums(p, g, p)
+		reply := wrapMsg(dst, newDst, 1, encoded)
+		swtch(reply)
+	} else if op == 2 {
+		p := BN(state["p"])
+		encoded := encodeBigNums(p)
+		reply := wrapMsg(dst, newDst, 2, encoded)
+		swtch(reply)
+	} else if op == 3 || op == 4 {
+		decoded := decodeByteSlices(payload, 2)
+		ct := decoded[0]
+		iv := decoded[1]
+
+		// s=0 because p^a%p or p^b%p == 0
+		s := big.NewInt(0)
+		pt := decryptCBCAndStripPad(ct, iv, s)
+		fmt.Printf("decrypted pt: %s\n", pt)
+		reply := wrapMsg(dst, newDst, op, payload)
+		swtch(reply)
+	}
+}
+
+func ThirtyFourth() {
+	payload := msgTypeFirst(alice, eve, []byte{}, aliceState)
+	swtch(payload)
 }
