@@ -21,7 +21,6 @@ var names map[string]string
 var aliceState map[string]interface{}
 var bobState map[string]interface{}
 var eveState map[string]interface{}
-var eveBobState map[string]interface{}
 
 func init() {
 	DHpSlice, _ := hex.DecodeString(
@@ -31,7 +30,6 @@ func init() {
 	aliceState = make(map[string]interface{})
 	bobState = make(map[string]interface{})
 	eveState = make(map[string]interface{})
-	eveBobState = make(map[string]interface{})
 	names = make(map[string]string)
 	names[alice] = "alice"
 	names[bob] = "bob"
@@ -295,21 +293,159 @@ func msgTypeFifth(src, dst string, payload []byte, state map[string]interface{})
 	return []byte{}
 }
 
+func msgTypeTenth(src, dst string, data []byte, state map[string]interface{}) []byte {
+	p := DHp
+	g := DHg
+	state["p"] = p
+	state["g"] = g
+
+	encoded := encodeBigNums(p, g)
+	payload := wrapMsg(src, dst, 10, encoded)
+
+	return payload
+}
+
+func msgTypeEleventh(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=10\n", names[dst])
+	digits := decodeBigNums(payload, 2)
+	p := digits[0]
+	g := digits[1]
+	state["p"] = p
+	state["g"] = g
+
+	encoded := encodeBytes([]byte{1})
+	reply := wrapMsg(dst, src, 11, encoded)
+
+	return reply
+}
+
+func msgTypeTwelfth(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=11\n", names[dst])
+	pl := decodeByteSlices(payload, 1)
+	ack := pl[0][0]
+	if ack != byte(1) {
+		panic("p, g not ack")
+	}
+	p := BN(state["p"])
+	g := BN(state["g"])
+
+	a := genPrivKey(p)
+	state["a"] = a
+	A := ExpInt(g, a, p)
+
+	encoded := encodeBigNums(A)
+	reply := wrapMsg(dst, src, 12, encoded)
+
+	return reply
+}
+
+func msgTypeThirteenth(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=12\n", names[dst])
+	digits := decodeBigNums(payload, 1)
+	A := digits[0]
+	state["A"] = A
+	p := BN(state["p"])
+	g := BN(state["g"])
+
+	b := genPrivKey(p)
+	state["b"] = b
+	B := ExpInt(g, b, p)
+
+	encoded := encodeBigNums(B)
+	reply := wrapMsg(dst, src, 13, encoded)
+
+	return reply
+}
+
+func msgTypeFourteenth(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=13\n", names[dst])
+	digits := decodeBigNums(payload, 1)
+	B := digits[0]
+	p := BN(state["p"])
+	a := BN(state["a"])
+
+	s := ExpInt(B, a, p)
+	state["s"] = s
+	msg := []byte("hello world")
+	ct, iv := padAndEncryptCBC(msg, s)
+
+	encoded := encodeBytes(ct, iv)
+	reply := wrapMsg(dst, src, 14, encoded)
+
+	return reply
+}
+
+func msgTypeFifteenth(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=14\n", names[dst])
+	b := BN(state["b"])
+	p := BN(state["p"])
+	A := BN(state["A"])
+	decoded := decodeByteSlices(payload, 2)
+	ct := decoded[0]
+	iv := decoded[1]
+
+	s := ExpInt(A, b, p)
+	state["s"] = s
+	pt := decryptCBCAndStripPad(ct, iv, s)
+	ct, iv = padAndEncryptCBC(pt, s)
+
+	encoded := encodeBytes(ct, iv)
+	reply := wrapMsg(dst, src, 15, encoded)
+
+	return reply
+}
+
+func msgTypeSixteenth(src, dst string, payload []byte, state map[string]interface{}) []byte {
+	fmt.Printf("%s received op=15\n", names[dst])
+	s := BN(state["s"])
+	decoded := decodeByteSlices(payload, 2)
+	ct := decoded[0]
+	iv := decoded[1]
+
+	pt := decryptCBCAndStripPad(ct, iv, s)
+	fmt.Printf("%s received a message from %s: \"%v\"\n", names[dst], names[src], string(pt))
+
+	return []byte{}
+}
+
 func Alice(payload []byte) {
 	src, dst, op := parseMeta(payload)
 	payload = payload[35:]
 	state := aliceState
-	if op == 1 {
-		reply := msgTypeSecond(src, dst, payload, state)
-		swtch(reply)
-	} else if op == 2 {
-		reply := msgTypeThird(src, dst, payload, state)
-		swtch(reply)
-	} else if op == 3 {
-		reply := msgTypeFourth(src, dst, payload, state)
-		swtch(reply)
-	} else if op == 4 {
-		msgTypeFifth(src, dst, payload, state)
+	if op > 0 && op < 10 {
+		// 34 challenge protocol
+		if op == 1 {
+			reply := msgTypeSecond(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 2 {
+			reply := msgTypeThird(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 3 {
+			reply := msgTypeFourth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 4 {
+			msgTypeFifth(src, dst, payload, state)
+		}
+	} else if op >= 10 && op < 20 {
+		// 35 challenge protocol
+		if op == 10 {
+			reply := msgTypeEleventh(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 11 {
+			reply := msgTypeTwelfth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 12 {
+			reply := msgTypeThirteenth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 13 {
+			reply := msgTypeFourteenth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 14 {
+			reply := msgTypeFifteenth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 15 {
+			msgTypeSixteenth(src, dst, payload, state)
+		}
 	}
 }
 
@@ -317,17 +453,40 @@ func Bob(payload []byte) {
 	src, dst, op := parseMeta(payload)
 	payload = payload[35:]
 	state := bobState
-	if op == 1 {
-		reply := msgTypeSecond(src, dst, payload, state)
-		swtch(reply)
-	} else if op == 2 {
-		reply := msgTypeThird(src, dst, payload, state)
-		swtch(reply)
-	} else if op == 3 {
-		reply := msgTypeFourth(src, dst, payload, state)
-		swtch(reply)
-	} else if op == 4 {
-		msgTypeFifth(src, dst, payload, state)
+	if op > 0 && op < 10 {
+		// 34 challenge protocol
+		if op == 1 {
+			reply := msgTypeSecond(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 2 {
+			reply := msgTypeThird(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 3 {
+			reply := msgTypeFourth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 4 {
+			msgTypeFifth(src, dst, payload, state)
+		}
+	} else if op >= 10 && op < 20 {
+		// 35 challenge protocol
+		if op == 10 {
+			reply := msgTypeEleventh(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 11 {
+			reply := msgTypeTwelfth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 12 {
+			reply := msgTypeThirteenth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 13 {
+			reply := msgTypeFourteenth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 14 {
+			reply := msgTypeFifteenth(src, dst, payload, state)
+			swtch(reply)
+		} else if op == 15 {
+			msgTypeSixteenth(src, dst, payload, state)
+		}
 	}
 }
 
@@ -342,34 +501,99 @@ func Eve(payload []byte) {
 		newDst = alice
 	}
 	state := eveState
-	if op == 1 {
-		digits := decodeBigNums(payload, 3)
-		p := digits[0]
-		g := digits[1]
-		state["p"] = p
-		encoded := encodeBigNums(p, g, p)
-		reply := wrapMsg(dst, newDst, 1, encoded)
-		swtch(reply)
-	} else if op == 2 {
-		p := BN(state["p"])
-		encoded := encodeBigNums(p)
-		reply := wrapMsg(dst, newDst, 2, encoded)
-		swtch(reply)
-	} else if op == 3 || op == 4 {
-		decoded := decodeByteSlices(payload, 2)
-		ct := decoded[0]
-		iv := decoded[1]
+	if op > 0 && op < 10 {
+		// 34 challenge protocol
+		if op == 1 {
+			digits := decodeBigNums(payload, 3)
+			p := digits[0]
+			g := digits[1]
+			state["p"] = p
+			encoded := encodeBigNums(p, g, p)
+			reply := wrapMsg(dst, newDst, 1, encoded)
+			swtch(reply)
+		} else if op == 2 {
+			p := BN(state["p"])
+			encoded := encodeBigNums(p)
+			reply := wrapMsg(dst, newDst, 2, encoded)
+			swtch(reply)
+		} else if op == 3 || op == 4 {
+			decoded := decodeByteSlices(payload, 2)
+			ct := decoded[0]
+			iv := decoded[1]
 
-		// s=0 because p^a%p or p^b%p == 0
-		s := big.NewInt(0)
-		pt := decryptCBCAndStripPad(ct, iv, s)
-		fmt.Printf("decrypted pt: %s\n", pt)
-		reply := wrapMsg(dst, newDst, op, payload)
-		swtch(reply)
+			// s=0 because p^a%p or p^b%p == 0
+			s := big.NewInt(0)
+			pt := decryptCBCAndStripPad(ct, iv, s)
+			fmt.Printf("decrypted pt: %s\n", pt)
+			reply := wrapMsg(dst, newDst, op, payload)
+			swtch(reply)
+		}
+	} else if op >= 10 && op < 20 {
+		// 35 challenge protocol
+		if op == 10 {
+			digits := decodeBigNums(payload, 2)
+			p := digits[0]
+			/*
+			   with g=1, S=1
+			   with g=p, S=0
+			   with g=p-1, S=0
+			*/
+			g := p.Sub(p, big.NewInt(1))
+			state["p"] = p
+			state["g"] = g
+			encoded := encodeBigNums(p, g)
+			reply := wrapMsg(dst, newDst, 10, encoded)
+			swtch(reply)
+		} else if op == 11 {
+			reply := wrapMsg(dst, newDst, 11, payload)
+			swtch(reply)
+		} else if op == 12 {
+			/*
+			   Alice:
+			   A = g^a = ?
+			   S = B^a = 1^a = 1
+
+			   Bob:
+			   B = 1^b = 1
+			   S = A^b = ?
+
+			   I don't see any other way for parties to
+			   agree on the same key besides modifying A
+			   as well.
+			   The other option would be to impersonate
+			   Bob as Eve and not engage Bob in coversation
+			   at all, not sure if this qualifies as MITM
+			   One more option is to somehow force both
+			   parties to agree on same g, but that would
+			   mean that the protocol description is wrong
+			*/
+			A := BN(state["p"])
+			encoded := encodeBigNums(A)
+			reply := wrapMsg(dst, newDst, 12, encoded)
+			swtch(reply)
+		} else if op == 13 {
+			reply := wrapMsg(dst, newDst, 13, payload)
+			swtch(reply)
+		} else if op == 14 || op == 15 {
+			decoded := decodeByteSlices(payload, 2)
+			ct := decoded[0]
+			iv := decoded[1]
+
+			s := big.NewInt(0)
+			pt := decryptCBCAndStripPad(ct, iv, s)
+			fmt.Printf("eve decrypted pt: %s\n", pt)
+			reply := wrapMsg(dst, newDst, op, payload)
+			swtch(reply)
+		}
 	}
 }
 
 func ThirtyFourth() {
 	payload := msgTypeFirst(alice, eve, []byte{}, aliceState)
+	swtch(payload)
+}
+
+func ThirtyFifth() {
+	payload := msgTypeTenth(alice, eve, []byte{}, aliceState)
 	swtch(payload)
 }
