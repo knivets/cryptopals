@@ -176,7 +176,65 @@ func client() {
 	fmt.Printf("%s\n", bodyString)
 }
 
+func clientWithDynamicA(A *big.Int) {
+	a := GenRandomInt(math.MaxInt64)
+	a.Mod(a, N)
+	postData := url.Values{"I": {I}, "A": {A.Text(16)}}
+	resp, err := http.PostForm(address+"first", postData)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+		return
+	}
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyString := string(bodyBytes)
+	data, _ := url.ParseQuery(bodyString)
+	resp.Body.Close()
+	B, _ := new(big.Int).SetString(data.Get("B"), 16)
+	uH := sha256.Sum256(append(A.Bytes(), B.Bytes()...))
+	u := new(big.Int).SetBytes(uH[:])
+	saltBt, _ := hex.DecodeString(data.Get("salt"))
+	xH := sha256.Sum256(append(saltBt, []byte(P)...))
+	x := new(big.Int).SetBytes(xH[:])
+	gx := ExpInt(g, x, N)
+	kgx := gx.Mul(gx, k)
+	lft := big.NewInt(0)
+	lft.Sub(B, kgx)
+	ux := big.NewInt(0)
+	ux.Mul(u, x)
+	rgt := big.NewInt(0)
+	rgt.Add(a, ux)
+	S := ExpInt(lft, rgt, N)
+	S = big.NewInt(0)
+	K := sha256.Sum256(S.Bytes())
+	hm := HMACSHA256(saltBt, K[:])
+	macSt := hex.EncodeToString(hm)
+	resp2, err2 := http.PostForm(address+"second", url.Values{
+		"mac": {macSt}})
+	if err2 != nil {
+		fmt.Printf("%s\n", err)
+		return
+	}
+	bodyBytes, _ = ioutil.ReadAll(resp2.Body)
+	bodyString = string(bodyBytes)
+	fmt.Printf("%s\n", bodyString)
+}
+
 func Srp() {
 	go server()
 	client()
+}
+
+func SrpZeroA() {
+	go server()
+	clientWithDynamicA(big.NewInt(0))
+}
+
+func SrpNA() {
+	go server()
+	clientWithDynamicA(N)
+}
+
+func SrpNA2() {
+	go server()
+	clientWithDynamicA(ExpInt(N, big.NewInt(2), big.NewInt(0)))
 }

@@ -602,3 +602,9 @@ func ThirtyFifth() {
 func ThirtySixth() {
 	srp.Srp()
 }
+
+func ThirtySeventh() {
+	//srp.SrpZeroA()
+	//srp.SrpNA()
+	srp.SrpNA2()
+}
