@@ -3,6 +3,7 @@ package fifth
 import (
 	"bytes"
 	"crypto/rand"
+	"cryptopals/fifth/srp"
 	"cryptopals/second"
 	"cryptopals/sha1"
 	"encoding/binary"
@@ -596,4 +597,8 @@ func ThirtyFourth() {
 func ThirtyFifth() {
 	payload := msgTypeTenth(alice, eve, []byte{}, aliceState)
 	swtch(payload)
+}
+
+func ThirtySixth() {
+	srp.Srp()
 }

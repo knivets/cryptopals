@@ -280,6 +280,10 @@ func ThirtyFifth() {
 	fifth.ThirtyFifth()
 }
 
+func ThirtySixth() {
+	fifth.ThirtySixth()
+}
+
 func main() {
-	ThirtyFifth()
+	ThirtySixth()
 }
