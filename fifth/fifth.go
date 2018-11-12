@@ -608,3 +608,7 @@ func ThirtySeventh() {
 	//srp.SrpNA()
 	srp.SrpNA2()
 }
+
+func ThirtyEighth() {
+	srp.SrpDict()
+}
