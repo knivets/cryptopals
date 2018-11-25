@@ -8,6 +8,7 @@ import (
 	"cryptopals/sha1"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -611,4 +612,105 @@ func ThirtySeventh() {
 
 func ThirtyEighth() {
 	srp.SrpDict()
+}
+
+type RSAPrivateKey struct {
+	d *big.Int
+	n *big.Int
+}
+
+type RSAPublicKey struct {
+	e *big.Int
+	n *big.Int
+}
+
+func bigSub(a, b *big.Int) *big.Int {
+	return new(big.Int).Sub(a, b)
+}
+
+func bigMul(a, b *big.Int) *big.Int {
+	return new(big.Int).Mul(a, b)
+}
+
+func EGCD(a, b *big.Int) (*big.Int, *big.Int, *big.Int) {
+	// (GCD, Bézout coefficients)
+	s := new(big.Int)
+	oldS := big.NewInt(1)
+	t := big.NewInt(1)
+	oldT := new(big.Int)
+	r := new(big.Int).Set(b)
+	oldR := new(big.Int).Set(a)
+	for r.Cmp(big.NewInt(0)) != 0 {
+		quot := new(big.Int)
+		quot.Div(oldR, r)
+		// (old_r, r) := (r, old_r - quotient * r)
+		tmp := bigSub(oldR, bigMul(quot, r))
+		oldR = r
+		r = tmp
+		// (old_s, s) := (s, old_s - quotient * s)
+		tmp = bigSub(oldS, bigMul(quot, s))
+		oldS = s
+		s = tmp
+		// (old_t, t) := (t, old_t - quotient * t)
+		tmp = bigSub(oldT, bigMul(quot, t))
+		oldT = t
+		t = tmp
+	}
+	return oldR, oldS, oldT
+}
+
+func ModInv(a, b *big.Int) (*big.Int, error) {
+	g, x, _ := EGCD(a, b)
+	if g.Cmp(big.NewInt(1)) == 0 {
+		res := new(big.Int).Set(x)
+		res.Mod(x, b)
+		return res, nil
+	} else {
+		return new(big.Int), errors.New("no modinverse")
+	}
+}
+
+func RSAEncrypt(key RSAPublicKey, msg *big.Int) *big.Int {
+	return ExpInt(msg, key.e, key.n)
+}
+
+func RSADecrypt(key RSAPrivateKey, ct *big.Int) *big.Int {
+	return ExpInt(ct, key.d, key.n)
+}
+
+func GenPrimes() (*big.Int, *big.Int) {
+	a, _ := rand.Prime(rand.Reader, 1024)
+	b, _ := rand.Prime(rand.Reader, 1024)
+	return a, b
+}
+
+var RSAe = big.NewInt(3)
+
+func RSAGenKeys() (RSAPublicKey, RSAPrivateKey) {
+	e := new(big.Int).Set(RSAe)
+	d := new(big.Int)
+	n := new(big.Int)
+	for true {
+		p, q := GenPrimes()
+		n.Mul(p, q)
+		one := big.NewInt(1)
+		pone := big.NewInt(0)
+		pone.Sub(p, one)
+		qone := big.NewInt(0)
+		qone.Sub(q, one)
+		et := new(big.Int)
+		et.Mul(pone, qone)
+
+		r, ok := ModInv(e, et)
+		d = r
+		if ok == nil {
+			//fmt.Printf("primes: %v %v\n", p, q)
+			break
+		}
+	}
+
+	pub := RSAPublicKey{e: e, n: n}
+	priv := RSAPrivateKey{d: d, n: n}
+
+	return pub, priv
 }

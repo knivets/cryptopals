@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"strings"
 )
 
@@ -292,6 +293,19 @@ func ThirtyEighth() {
 	fifth.ThirtyEighth()
 }
 
+func ThirtyNinth() {
+	pub, priv := fifth.RSAGenKeys()
+	ct := fifth.RSAEncrypt(pub, big.NewInt(42))
+	pt := fifth.RSADecrypt(priv, ct)
+	fmt.Printf("%v\n", pt)
+
+	s := "secret"
+	pt2 := new(big.Int).SetBytes([]byte(s))
+	ct2 := fifth.RSAEncrypt(pub, pt2)
+	pt3 := fifth.RSADecrypt(priv, ct2)
+	fmt.Printf("%v\n", string(pt3.Bytes()))
+}
+
 func main() {
-	ThirtyEighth()
+	ThirtyNinth()
 }
