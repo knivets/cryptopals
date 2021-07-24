@@ -714,3 +714,118 @@ func RSAGenKeys() (RSAPublicKey, RSAPrivateKey) {
 
 	return pub, priv
 }
+
+func ThirtyNinth() {
+	pub, priv := RSAGenKeys()
+	ct := RSAEncrypt(pub, big.NewInt(42))
+	pt := RSADecrypt(priv, ct)
+	fmt.Printf("%v\n", pt)
+
+	s := "secret"
+	pt2 := new(big.Int).SetBytes([]byte(s))
+	ct2 := RSAEncrypt(pub, pt2)
+	pt3 := RSADecrypt(priv, ct2)
+	fmt.Printf("%v\n", string(pt3.Bytes()))
+}
+
+// I cheated and reused the cube root algorithm from stackoverflow
+// I figured this is not really important when it comes to cryptography
+// so... https://stackoverflow.com/a/51390715/1491475
+func BigCbrt(i *big.Int) (cbrt *big.Int, rem *big.Int) {
+    var (
+        n0  = big.NewInt(0)
+        n1  = big.NewInt(1)
+        n2  = big.NewInt(2)
+        n3  = big.NewInt(3)
+    )
+    var (
+        guess   = new(big.Int).Div(i, n2)
+        guessSq = new(big.Int)
+        dx      = new(big.Int)
+        absDx   = new(big.Int)
+        minDx   = new(big.Int).Abs(i)
+        cube    = new(big.Int)
+        fx      = new(big.Int)
+        fxp     = new(big.Int)
+        step    = new(big.Int)
+    )
+    for {
+        cube.Exp(guess, n3, nil)
+        dx.Sub(i, cube)
+        cmp := dx.Cmp(n0)
+        if cmp == 0 {
+            return guess, n0
+        }
+
+        fx.Sub(cube, i)
+        guessSq.Exp(guess, n2, nil)
+        fxp.Mul(n3, guessSq)
+        step.Div(fx, fxp)
+        if step.Cmp(n0) == 0 {
+            step.Set(n1)
+        }
+
+        absDx.Abs(dx)
+        switch absDx.Cmp(minDx) {
+        case -1:
+            minDx.Set(absDx)
+        case 0:
+            return guess, dx
+        }
+
+        guess.Sub(guess, step)
+    }
+}
+
+
+func Fortieth() {
+	pub0, _ := RSAGenKeys()
+	pub1, _ := RSAGenKeys()
+	pub2, _ := RSAGenKeys()
+
+    s := "secret"
+
+	pt := new(big.Int).SetBytes([]byte(s))
+
+	ct0 := RSAEncrypt(pub0, pt)
+	ct1 := RSAEncrypt(pub1, pt)
+	ct2 := RSAEncrypt(pub2, pt)
+
+    n0 := pub0.n
+    n1 := pub1.n
+    n2 := pub2.n
+
+    ms0 := bigMul(n1, n2)
+    ms1 := bigMul(n0, n2)
+    ms2 := bigMul(n0, n1)
+
+    r0, ok0 := ModInv(ms0, n0)
+    if ok0 != nil {
+        panic("damn")
+    }
+
+    r1, ok1 := ModInv(ms1, n1)
+    if ok1 != nil {
+        panic("damn")
+    }
+
+    r2, ok2 := ModInv(ms2, n2)
+    if ok2 != nil {
+        panic("damn")
+    }
+
+    res0 := bigMul(bigMul(ct0, ms0), r0)
+    res1 := bigMul(bigMul(ct1, ms1), r1)
+    res2 := bigMul(bigMul(ct2, ms2), r2)
+
+
+    sum := new(big.Int)
+    sum.Add(res0, res1)
+    sum.Add(sum, res2)
+    nSum := bigMul(bigMul(n0, n1), n2)
+
+    result := new(big.Int).Mod(sum, nSum)
+    res, _ := BigCbrt(result)
+
+	fmt.Printf("%v\n", string(res.Bytes()))
+}
