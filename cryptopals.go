@@ -1,11 +1,11 @@
 package main
 
 import (
-	"cryptopals/fifth"
-	"cryptopals/first"
-	"cryptopals/fourth"
-	"cryptopals/second"
-	"cryptopals/third"
+	"knivets.com/cryptopals/fifth"
+	"knivets.com/cryptopals/first"
+	"knivets.com/cryptopals/fourth"
+	"knivets.com/cryptopals/second"
+	"knivets.com/cryptopals/third"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"

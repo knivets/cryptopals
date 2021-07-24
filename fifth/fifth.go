@@ -3,9 +3,9 @@ package fifth
 import (
 	"bytes"
 	"crypto/rand"
-	"cryptopals/fifth/srp"
-	"cryptopals/second"
-	"cryptopals/sha1"
+	"knivets.com/cryptopals/fifth/srp"
+	"knivets.com/cryptopals/second"
+	"knivets.com/cryptopals/sha1"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"

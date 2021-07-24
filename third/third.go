@@ -1,8 +1,8 @@
 package third
 
 import (
-	"cryptopals/first"
-	"cryptopals/second"
+	"knivets.com/cryptopals/first"
+	"knivets.com/cryptopals/second"
 	"encoding/base64"
 	"encoding/binary"
 	_ "encoding/hex"

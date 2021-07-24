@@ -2,7 +2,7 @@ package first
 
 import (
 	"crypto/aes"
-	"cryptopals/ecb"
+	"knivets.com/cryptopals/ecb"
 	"encoding/base64"
 	"encoding/hex"
 	"log"

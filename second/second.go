@@ -3,8 +3,8 @@ package second
 import (
 	"crypto/aes"
 	"crypto/rand"
-	"cryptopals/ecb"
-	"cryptopals/first"
+	"knivets.com/cryptopals/ecb"
+	"knivets.com/cryptopals/first"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"

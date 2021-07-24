@@ -1,11 +1,11 @@
 package fourth
 
 import (
-	"cryptopals/first"
-	"cryptopals/md4"
-	"cryptopals/second"
-	"cryptopals/sha1"
-	"cryptopals/third"
+	"knivets.com/cryptopals/first"
+	"knivets.com/cryptopals/md4"
+	"knivets.com/cryptopals/second"
+	"knivets.com/cryptopals/sha1"
+	"knivets.com/cryptopals/third"
 	"encoding/hex"
 	"fmt"
 	"log"
