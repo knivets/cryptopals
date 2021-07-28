@@ -615,21 +615,25 @@ func ThirtyEighth() {
 }
 
 type RSAPrivateKey struct {
-	d *big.Int
-	n *big.Int
+	D *big.Int
+	N *big.Int
 }
 
 type RSAPublicKey struct {
-	e *big.Int
-	n *big.Int
+	E *big.Int
+	N *big.Int
 }
 
-func bigSub(a, b *big.Int) *big.Int {
+func BigSub(a, b *big.Int) *big.Int {
 	return new(big.Int).Sub(a, b)
 }
 
-func bigMul(a, b *big.Int) *big.Int {
+func BigMul(a, b *big.Int) *big.Int {
 	return new(big.Int).Mul(a, b)
+}
+
+func BigMod(a, b *big.Int) *big.Int {
+	return new(big.Int).Mod(a, b)
 }
 
 func EGCD(a, b *big.Int) (*big.Int, *big.Int, *big.Int) {
@@ -644,15 +648,15 @@ func EGCD(a, b *big.Int) (*big.Int, *big.Int, *big.Int) {
 		quot := new(big.Int)
 		quot.Div(oldR, r)
 		// (old_r, r) := (r, old_r - quotient * r)
-		tmp := bigSub(oldR, bigMul(quot, r))
+		tmp := BigSub(oldR, BigMul(quot, r))
 		oldR = r
 		r = tmp
 		// (old_s, s) := (s, old_s - quotient * s)
-		tmp = bigSub(oldS, bigMul(quot, s))
+		tmp = BigSub(oldS, BigMul(quot, s))
 		oldS = s
 		s = tmp
 		// (old_t, t) := (t, old_t - quotient * t)
-		tmp = bigSub(oldT, bigMul(quot, t))
+		tmp = BigSub(oldT, BigMul(quot, t))
 		oldT = t
 		t = tmp
 	}
@@ -671,11 +675,11 @@ func ModInv(a, b *big.Int) (*big.Int, error) {
 }
 
 func RSAEncrypt(key RSAPublicKey, msg *big.Int) *big.Int {
-	return ExpInt(msg, key.e, key.n)
+	return ExpInt(msg, key.E, key.N)
 }
 
 func RSADecrypt(key RSAPrivateKey, ct *big.Int) *big.Int {
-	return ExpInt(ct, key.d, key.n)
+	return ExpInt(ct, key.D, key.N)
 }
 
 func GenPrimes() (*big.Int, *big.Int) {
@@ -709,8 +713,8 @@ func RSAGenKeys() (RSAPublicKey, RSAPrivateKey) {
 		}
 	}
 
-	pub := RSAPublicKey{e: e, n: n}
-	priv := RSAPrivateKey{d: d, n: n}
+	pub := RSAPublicKey{E: e, N: n}
+	priv := RSAPrivateKey{D: d, N: n}
 
 	return pub, priv
 }
@@ -791,13 +795,13 @@ func Fortieth() {
 	ct1 := RSAEncrypt(pub1, pt)
 	ct2 := RSAEncrypt(pub2, pt)
 
-    n0 := pub0.n
-    n1 := pub1.n
-    n2 := pub2.n
+    n0 := pub0.N
+    n1 := pub1.N
+    n2 := pub2.N
 
-    ms0 := bigMul(n1, n2)
-    ms1 := bigMul(n0, n2)
-    ms2 := bigMul(n0, n1)
+    ms0 := BigMul(n1, n2)
+    ms1 := BigMul(n0, n2)
+    ms2 := BigMul(n0, n1)
 
     r0, ok0 := ModInv(ms0, n0)
     if ok0 != nil {
@@ -814,15 +818,15 @@ func Fortieth() {
         panic("damn")
     }
 
-    res0 := bigMul(bigMul(ct0, ms0), r0)
-    res1 := bigMul(bigMul(ct1, ms1), r1)
-    res2 := bigMul(bigMul(ct2, ms2), r2)
+    res0 := BigMul(BigMul(ct0, ms0), r0)
+    res1 := BigMul(BigMul(ct1, ms1), r1)
+    res2 := BigMul(BigMul(ct2, ms2), r2)
 
 
     sum := new(big.Int)
     sum.Add(res0, res1)
     sum.Add(sum, res2)
-    nSum := bigMul(bigMul(n0, n1), n2)
+    nSum := BigMul(BigMul(n0, n1), n2)
 
     result := new(big.Int).Mod(sum, nSum)
     res, _ := BigCbrt(result)

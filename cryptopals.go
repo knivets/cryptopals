@@ -1,11 +1,12 @@
 package main
 
 import (
-	"knivets.com/cryptopals/fifth"
 	"knivets.com/cryptopals/first"
-	"knivets.com/cryptopals/fourth"
 	"knivets.com/cryptopals/second"
 	"knivets.com/cryptopals/third"
+	"knivets.com/cryptopals/fourth"
+	"knivets.com/cryptopals/fifth"
+	"knivets.com/cryptopals/sixth"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -300,6 +301,10 @@ func Fortieth() {
 	fifth.Fortieth()
 }
 
+func FortyFirst() {
+	sixth.FortyFirst()
+}
+
 func main() {
-	Fortieth()
+	FortyFirst()
 }
