@@ -305,6 +305,10 @@ func FortyFirst() {
 	sixth.FortyFirst()
 }
 
+func FortySecond() {
+	sixth.FortySecond()
+}
+
 func main() {
-	FortyFirst()
+	FortySecond()
 }
