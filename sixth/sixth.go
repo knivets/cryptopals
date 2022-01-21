@@ -7,9 +7,12 @@ import (
     "bytes"
 	"math"
 	"math/big"
+	"errors"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/hex"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/md5"
 	"net/http"
@@ -205,4 +208,128 @@ func FortySecond() {
     forged := RSAForgeSignature([]byte(msg), pub)
     forgedValid := RSAVerifySignature([]byte(msg), forged, pub)
     fmt.Printf("forged signature accepted: %v\n", forgedValid)
+}
+
+type DSAPrivateKey struct {
+	x *big.Int
+    q *big.Int
+    g *big.Int
+    p *big.Int
+}
+
+type DSAPublicKey struct {
+	y *big.Int
+    q *big.Int
+    g *big.Int
+    p *big.Int
+}
+
+func DSAGenKeys() (DSAPublicKey, DSAPrivateKey) {
+    p, _ := new(big.Int).SetString("800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1", 16)
+    q, _ := new(big.Int).SetString("f4f47f05794b256174bba6e9b396a7707e563c5b", 16)
+    g, _ := new(big.Int).SetString("5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119458fef538b8fa4046c8db53039db620c094c9fa077ef389b5322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a0470f5b64c36b625a097f1651fe775323556fe00b3608c887892878480e99041be601a62166ca6894bdd41a7054ec89f756ba9fc95302291", 16)
+
+	x, _ := rand.Int(rand.Reader, new(big.Int).Sub(q, big.NewInt(2)))
+    x.Add(x, big.NewInt(1))
+    y := fifth.ExpInt(g, x, p)
+
+    return DSAPublicKey{y: y, q: q, g: g, p: p}, DSAPrivateKey{x: x, q: q, g: g, p: p}
+}
+
+func DSAVerifySignature(msg []byte, pub DSAPublicKey, r *big.Int, s *big.Int) bool {
+    w, err := fifth.ModInv(s, pub.q)
+    if err != nil {
+        panic("error")
+    }
+    hsh := sha1.Sum(msg)
+    hshInt := new(big.Int).SetBytes(hsh[:])
+    u1 := new(big.Int).Mul(hshInt, w)
+    u1.Mod(u1, pub.q)
+    u2 := new(big.Int).Mul(r, w)
+    u2.Mod(u2, pub.q)
+
+    gu := fifth.ExpInt(pub.g, u1, pub.p)
+    yu := fifth.ExpInt(pub.y, u2, pub.p)
+    v := new(big.Int).Mul(gu, yu)
+    v.Mod(v, pub.p)
+    v.Mod(v, pub.q)
+    return v.Cmp(r) == 0
+}
+
+func testDSAImplementation(msg []byte) {
+	pub, _ := DSAGenKeys()
+    // verify that the algo works correctly by checking the signature
+    pub.y.SetString("84ad4719d044495496a3201c8ff484feb45b962e7302e56a392aee4abab3e4bdebf2955b4736012f21a08084056b19bcd7fee56048e004e44984e2f411788efdc837a0d2e5abb7b555039fd243ac01f0fb2ed1dec568280ce678e931868d23eb095fde9d3779191b8c0299d6e07bbb283e6633451e535c45513b2d33c99ea17", 16)
+    r, _ := new(big.Int).SetString("548099063082341131477253921760299949438196259240", 10)
+    s, _ := new(big.Int).SetString("857042759984254168557880549501802188789837994940", 10)
+    if !DSAVerifySignature(msg, pub, r, s){
+        panic("Something is wrong with DSA implementation")
+    }
+}
+
+func DSASign(msg []byte, priv DSAPrivateKey) (r, s *big.Int) {
+    k, _ := rand.Int(rand.Reader, new(big.Int).Sub(priv.q, big.NewInt(2)))
+    k.Add(k, big.NewInt(1))
+
+    r = fifth.ExpInt(priv.g, k, priv.p)
+    r.Mod(r, priv.q)
+
+    if r.Cmp(big.NewInt(0)) != 0 {
+        modK, _ := fifth.ModInv(k, priv.q)
+        xr := new(big.Int).Mul(priv.x, r)
+        hsh := sha1.Sum(msg)
+        hshInt := new(big.Int).SetBytes(hsh[:])
+        xrHsh := new(big.Int).Add(xr, hshInt)
+        xrHsh.Mod(xrHsh, priv.q)
+        s = new(big.Int).Mul(modK, xrHsh)
+        s.Mod(s, priv.q)
+        if s.Cmp(big.NewInt(0)) != 0 {
+            return r, s
+        }
+    }
+    return DSASign(msg, priv)
+}
+
+func DSARecoverPrivateKey(msg []byte, r, s, k, q *big.Int) *big.Int {
+    hsh := sha1.Sum(msg)
+    hshInt := new(big.Int).SetBytes(hsh[:])
+    x := new(big.Int).Mul(s, k)
+    x.Sub(x, hshInt)
+    rInv, _ := fifth.ModInv(r, q)
+    x.Mul(x, rInv)
+    x.Mod(x, q)
+    return x
+}
+
+func pickDSAK(msg []byte) (*big.Int, error) {
+    hsh := "0954edd5e0afe5542a4adf012611a91912a3ec16"
+    r, _ := new(big.Int).SetString("548099063082341131477253921760299949438196259240", 10)
+    s, _ := new(big.Int).SetString("857042759984254168557880549501802188789837994940", 10)
+    q, _ := new(big.Int).SetString("f4f47f05794b256174bba6e9b396a7707e563c5b", 16)
+
+    for i := 0; i <= math.MaxUint16; i++ {
+        k := big.NewInt(int64(i))
+        x := DSARecoverPrivateKey(msg, r, s, k, q)
+        hx := x.Text(16)
+        _hsh := sha1.Sum([]byte(hx))
+        guess := hex.EncodeToString(_hsh[:])
+
+        if guess == hsh {
+            return x, nil
+        }
+    }
+    return nil, errors.New("Haven't found anything")
+}
+
+func FortyThird() {
+    msg := []byte("For those that envy a MC it can be hazardous to your health\nSo be friendly, a matter of life and death, just like a etch-a-sketch\n")
+    testDSAImplementation(msg)
+
+	pub, priv := DSAGenKeys()
+    r, s := DSASign(msg, priv)
+    DSAVerifySignature(msg, pub, r, s)
+    x, err := pickDSAK(msg)
+    if err == nil {
+        fmt.Printf("private key recovered: %v\n", x)
+    }
 }
