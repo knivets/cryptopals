@@ -8,6 +8,8 @@ import (
 	"math"
 	"math/big"
 	"errors"
+	"io/ioutil"
+	"strings"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
@@ -331,5 +333,89 @@ func FortyThird() {
     x, err := pickDSAK(msg)
     if err == nil {
         fmt.Printf("private key recovered: %v\n", x)
+    }
+}
+
+type MsgDSASignature struct {
+    msg string
+    s *big.Int
+    r *big.Int
+}
+
+func loadAndParseSigs() []MsgDSASignature {
+    data, err := ioutil.ReadFile("44.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+    msgs := []MsgDSASignature{}
+	msgStrs := strings.Split(string(data), "msg: ")
+    for _, msg := range msgStrs[1:] {
+        msgVals := strings.Split(msg, "\n")
+        msgStrct := MsgDSASignature{msg: msgVals[0]}
+        for i, msgKV := range msgVals[1:] {
+            val := strings.Split(msgKV, ": ")
+            if i == 0 {
+                msgStrct.s, _ = new(big.Int).SetString(val[1], 10)
+            } else if i == 1 {
+                msgStrct.r, _ = new(big.Int).SetString(val[1], 10)
+            } else if i == 2 {
+                m, _ := new(big.Int).SetString(val[1], 16)
+                hsh := sha1.Sum([]byte(msgStrct.msg))
+                if bytes.Compare(hsh[:], m.Bytes()) != 0 {
+                    log.Fatalf("Signature is broken for message: '%v'", msgStrct.msg)
+                }
+            }
+        }
+        //fmt.Printf("msg: %v, s: %v, r: %v\n", msgStrct.msg, msgStrct.s, msgStrct.r)
+        msgs = append(msgs, msgStrct)
+    }
+    return msgs
+}
+
+func RecoverKFromMsgs(m1, m2, s1, s2, q *big.Int) (k *big.Int) {
+    m1m2 := new(big.Int).Sub(m1, m2)
+    m1m2.Mod(m1m2, q)
+    s1s2 := new(big.Int).Sub(s1, s2)
+    s1s2.Mod(s1s2, q)
+    s1s2Inv, _ := fifth.ModInv(s1s2, q)
+    k = new(big.Int).Mul(m1m2, s1s2Inv)
+    return k
+}
+
+func FortyFourth() {
+    privHsh := "ca8f6f7c66fa362d40760d135b763eb8527d3d52"
+    q, _ := new(big.Int).SetString("f4f47f05794b256174bba6e9b396a7707e563c5b", 16)
+    sigs := loadAndParseSigs()
+    var x *big.Int;
+    for i, sig := range sigs {
+        hsh := sha1.Sum([]byte(sig.msg))
+        m1 := new(big.Int).SetBytes(hsh[:])
+        for i2, sig2 := range sigs {
+            if i == i2 {
+                continue
+            }
+            hsh := sha1.Sum([]byte(sig2.msg))
+            m2 := new(big.Int).SetBytes(hsh[:])
+
+            k := RecoverKFromMsgs(m1, m2, sig.s, sig2.s, q)
+            _x := DSARecoverPrivateKey([]byte(sig.msg), sig.r, sig.s, k, q)
+            hx := _x.Text(16)
+            _hsh := sha1.Sum([]byte(hx))
+            guess := hex.EncodeToString(_hsh[:])
+
+            if guess == privHsh {
+                x = _x
+                break
+            }
+        }
+    }
+    if x != nil {
+        p, _ := new(big.Int).SetString("800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1", 16)
+        g, _ := new(big.Int).SetString("5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119458fef538b8fa4046c8db53039db620c094c9fa077ef389b5322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a0470f5b64c36b625a097f1651fe775323556fe00b3608c887892878480e99041be601a62166ca6894bdd41a7054ec89f756ba9fc95302291", 16)
+
+        y := fifth.ExpInt(g, x, p)
+        fmt.Printf("x: %v\n", x)
+        fmt.Printf("y: %x\n", y)
+
     }
 }
