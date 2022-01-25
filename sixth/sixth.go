@@ -419,3 +419,87 @@ func FortyFourth() {
 
     }
 }
+
+func DSAGenKeysWithParams(g *big.Int) (DSAPublicKey, DSAPrivateKey) {
+    p, _ := new(big.Int).SetString("800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1", 16)
+    q, _ := new(big.Int).SetString("f4f47f05794b256174bba6e9b396a7707e563c5b", 16)
+
+	x, _ := rand.Int(rand.Reader, new(big.Int).Sub(q, big.NewInt(2)))
+    x.Add(x, big.NewInt(1))
+    y := fifth.ExpInt(g, x, p)
+
+    return DSAPublicKey{y: y, q: q, g: g, p: p}, DSAPrivateKey{x: x, q: q, g: g, p: p}
+}
+
+// g=0 case is not possible with the regular DSA signing algorithm
+func DSASignRelaxed(msg []byte, priv DSAPrivateKey) (r, s *big.Int) {
+    k, _ := rand.Int(rand.Reader, new(big.Int).Sub(priv.q, big.NewInt(2)))
+    k.Add(k, big.NewInt(1))
+
+    r = fifth.ExpInt(priv.g, k, priv.p)
+    r.Mod(r, priv.q)
+
+    modK, _ := fifth.ModInv(k, priv.q)
+    xr := new(big.Int).Mul(priv.x, r)
+    hsh := sha1.Sum(msg)
+    hshInt := new(big.Int).SetBytes(hsh[:])
+    xrHsh := new(big.Int).Add(xr, hshInt)
+    xrHsh.Mod(xrHsh, priv.q)
+    s = new(big.Int).Mul(modK, xrHsh)
+    s.Mod(s, priv.q)
+    return r, s
+}
+
+func DSAMagicSignature(pub DSAPublicKey, p, q *big.Int) (r, s *big.Int) {
+    // not sure what z actually is, so just assume that it's a rand int
+    z, _ := rand.Int(rand.Reader, new(big.Int).Sub(q, big.NewInt(2)))
+    z.Add(z, big.NewInt(1))
+
+    r = fifth.ExpInt(pub.y, z, p)
+    r.Mod(r, q)
+    zInv, _ := fifth.ModInv(z, q)
+    s = new(big.Int).Mul(r, zInv)
+    return
+}
+
+func FortyFifth() {
+    msg := []byte("Hello, world")
+    msg2 := []byte("Goodbye, world")
+
+    p, _ := new(big.Int).SetString("800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1", 16)
+    g0 := big.NewInt(0)
+    g0pub, g0priv := DSAGenKeysWithParams(g0)
+    g0pub2, g0priv2 := DSAGenKeysWithParams(g0)
+    fmt.Printf("g=0 first keypair y=%v, x=%v\n", g0pub.y, g0priv.x)
+    fmt.Printf("g=0 second keypaiy y=%v, x=%v\n", g0pub2.y, g0priv2.x)
+    r, s := DSASignRelaxed(msg, g0priv)
+    fmt.Printf("g=0 signature: r=%v s=%v\n", r, s)
+    res := DSAVerifySignature(msg2, g0pub, r, s)
+    fmt.Printf("g=0 sig for arbitrary message verified: %v\n", res)
+    res1 := DSAVerifySignature(msg2, g0pub2, r, s)
+    fmt.Printf("g=0 sig for arbitrary message and pubkey verified: %v\n", res1)
+
+    g := p.Add(p, big.NewInt(1))
+    pub, priv := DSAGenKeysWithParams(g)
+    pub2, priv2 := DSAGenKeysWithParams(g)
+
+    fmt.Printf("g=p+1 first keypair y=%v, x=%v\n", pub.y, priv.x)
+    fmt.Printf("g=p+1 second keypaiy y=%v, x=%v\n", pub2.y, priv2.x)
+    r1, s1 := DSASign(msg, priv)
+    fmt.Printf("g=p+1 signature: r=%v s=%v\n", r1, s1)
+    res2 := DSAVerifySignature(msg2, pub, r1, s1)
+    fmt.Printf("g=p+1 sig for arbitrary message verified: %v\n", res2)
+
+    res3 := DSAVerifySignature(msg2, pub2, r, s)
+    fmt.Printf("g=p+1 sig for arbitrary message and pubkey failed: %v\n", res3 == false)
+
+    r2, s2 := DSAMagicSignature(pub, pub.p, pub.q)
+    fmt.Printf("g=p+1 magic sig: r=%v s=%v\n", r2, s2)
+    res4 := DSAVerifySignature(msg, pub, r2, s2)
+    fmt.Printf("g=p+1 magic sig for arbitrary message verified: %v\n", res4)
+    res5 := DSAVerifySignature(msg2, pub, r2, s2)
+    fmt.Printf("g=p+1 magic sig for arbitrary message verified: %v\n", res5)
+
+    res6 := DSAVerifySignature(msg2, pub2, r2, s2)
+    fmt.Printf("g=p+1 magic sig for arbitrary message and pubkey verified: %v\n", res6)
+}
