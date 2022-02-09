@@ -273,46 +273,6 @@ func ThirtyThird() {
 	fmt.Printf("key: %d\n", key)
 }
 
-func ThirtyFourth() {
-	fifth.ThirtyFourth()
-}
-
-func ThirtyFifth() {
-	fifth.ThirtyFifth()
-}
-
-func ThirtySixth() {
-	fifth.ThirtySixth()
-}
-
-func ThirtySeventh() {
-	fifth.ThirtySeventh()
-}
-
-func ThirtyEighth() {
-	fifth.ThirtyEighth()
-}
-
-func ThirtyNinth() {
-	fifth.ThirtyNinth()
-}
-
-func Fortieth() {
-	fifth.Fortieth()
-}
-
-func FortyFirst() {
-	sixth.FortyFirst()
-}
-
-func FortySecond() {
-	sixth.FortySecond()
-}
-
-func FortyThird() {
-	sixth.FortyThird()
-}
-
 func main() {
-    sixth.FortyFifth()
+    sixth.FortySixth()
 }

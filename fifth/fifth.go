@@ -683,9 +683,10 @@ func RSADecrypt(key RSAPrivateKey, ct *big.Int) *big.Int {
 }
 
 func GenPrimes() (*big.Int, *big.Int) {
-	a, _ := rand.Prime(rand.Reader, 1024)
-	b, _ := rand.Prime(rand.Reader, 1024)
-	return a, b
+    bitLen := 1024
+    a, _ := rand.Prime(rand.Reader, bitLen)
+    b, _ := rand.Prime(rand.Reader, bitLen)
+    return a, b
 }
 
 var RSAe = big.NewInt(3)

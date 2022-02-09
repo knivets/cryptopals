@@ -503,3 +503,70 @@ func FortyFifth() {
     res6 := DSAVerifySignature(msg2, pub2, r2, s2)
     fmt.Printf("g=p+1 magic sig for arbitrary message and pubkey verified: %v\n", res6)
 }
+
+func isEven(pt *big.Int) bool {
+    one := big.NewInt(1)
+    res := new(big.Int).And(pt, one)
+    return res.Cmp(one) != 0
+}
+
+var (pub, priv = fifth.RSAGenKeys())
+
+func RSAParityOracle(ct *big.Int) bool {
+	pt := fifth.RSADecrypt(priv, ct)
+    return isEven(pt)
+}
+
+func bClone(a *big.Int) *big.Int {
+    return new(big.Int).SetBytes(a.Bytes())
+}
+
+func DivByTwo(a *big.Int) *big.Int {
+    mode := 0
+    var res *big.Int
+    if mode == 1 {
+        res, _ = new(big.Int).DivMod(a, big.NewInt(2), new(big.Int))
+    } else {
+        res = new(big.Int).Div(a, big.NewInt(2))
+    }
+    return res
+}
+
+func decryptRSAViaOracle(ct *big.Int, pub fifth.RSAPublicKey) []byte {
+    ptStart := big.NewInt(0)
+    var N *big.Int
+    nPrime := 1
+    if nPrime == 1 {
+        N = bClone(pub.N)
+    } else {
+        N = new(big.Int).Sub(pub.N, big.NewInt(1))
+    }
+    ptEnd := bClone(N)
+    accumN := bClone(N)
+    current := bClone(ct)
+    two := big.NewInt(2)
+    twoEnc := fifth.RSAEncrypt(pub, two)
+    twos := big.NewInt(1)
+    // log2(N) iterations
+    for twos.Cmp(N) <= 0 {
+        current.Mul(current, twoEnc)
+        even := RSAParityOracle(current)
+        accumN = DivByTwo(accumN)
+        if even == true {
+            ptEnd.Sub(ptEnd, accumN)
+        } else {
+            ptStart.Sub(ptStart, accumN)
+        }
+        twos.Mul(twos, two)
+    }
+    return ptEnd.Bytes()
+}
+
+func FortySixth() {
+    secret := "VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=="
+	secretBt, _ := base64.StdEncoding.DecodeString(secret)
+	secretPt := new(big.Int).SetBytes(secretBt)
+	ct := fifth.RSAEncrypt(pub, secretPt)
+    pt := decryptRSAViaOracle(ct, pub)
+    fmt.Printf("%v\n", string(pt))
+}
