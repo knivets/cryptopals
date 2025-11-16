@@ -570,3 +570,311 @@ func FortySixth() {
     pt := decryptRSAViaOracle(ct, pub)
     fmt.Printf("%v\n", string(pt))
 }
+
+// PKCS#1 v1.5 padding: 0x00 || 0x02 || PS || 0x00 || M
+// where PS is a random non-zero padding string of at least 8 bytes
+func PKCS1v15Pad(msg []byte, k int) ([]byte, error) {
+    mLen := len(msg)
+    if mLen > k-11 {
+        return nil, errors.New("message too long")
+    }
+
+    // Calculate padding length
+    psLen := k - mLen - 3
+
+    // Build the padded message
+    padded := make([]byte, k)
+    padded[0] = 0x00
+    padded[1] = 0x02
+
+    // Generate random non-zero bytes for PS
+    ps := make([]byte, psLen)
+    for i := 0; i < psLen; {
+        b := make([]byte, 1)
+        rand.Read(b)
+        if b[0] != 0x00 {
+            ps[i] = b[0]
+            i++
+        }
+    }
+
+    copy(padded[2:], ps)
+    padded[2+psLen] = 0x00
+    copy(padded[3+psLen:], msg)
+
+    return padded, nil
+}
+
+// PKCS#1 v1.5 unpadding
+func PKCS1v15Unpad(padded []byte) ([]byte, error) {
+    if len(padded) < 11 {
+        return nil, errors.New("invalid padding")
+    }
+
+    if padded[0] != 0x00 || padded[1] != 0x02 {
+        return nil, errors.New("invalid padding")
+    }
+
+    // Find the 0x00 separator
+    var i int
+    for i = 2; i < len(padded); i++ {
+        if padded[i] == 0x00 {
+            break
+        }
+    }
+
+    if i >= len(padded) || i < 10 {
+        return nil, errors.New("invalid padding")
+    }
+
+    return padded[i+1:], nil
+}
+
+// Generate smaller keys for faster attack demonstration
+func RSAGenSmallKeys() (fifth.RSAPublicKey, fifth.RSAPrivateKey) {
+	e := big.NewInt(3)
+	d := new(big.Int)
+	n := new(big.Int)
+	for true {
+		// Use 256-bit primes for faster attack (512-bit modulus)
+		p, _ := rand.Prime(rand.Reader, 256)
+		q, _ := rand.Prime(rand.Reader, 256)
+		n.Mul(p, q)
+		one := big.NewInt(1)
+		pone := new(big.Int).Sub(p, one)
+		qone := new(big.Int).Sub(q, one)
+		et := new(big.Int).Mul(pone, qone)
+
+		r, ok := fifth.ModInv(e, et)
+		d = r
+		if ok == nil {
+			break
+		}
+	}
+
+	pub := fifth.RSAPublicKey{E: e, N: n}
+	priv := fifth.RSAPrivateKey{D: d, N: n}
+
+	return pub, priv
+}
+
+var (pub47, priv47 = RSAGenSmallKeys())
+
+// Padding oracle that checks if decrypted ciphertext has valid PKCS#1 v1.5 padding
+func PKCS1v15PaddingOracle(ct *big.Int) bool {
+    pt := fifth.RSADecrypt(priv47, ct)
+    k := priv47.N.BitLen() / 8
+
+    // Convert to bytes with proper length
+    ptBytes := pt.Bytes()
+
+    // Pad with leading zeros if necessary
+    if len(ptBytes) < k {
+        padded := make([]byte, k)
+        copy(padded[k-len(ptBytes):], ptBytes)
+        ptBytes = padded
+    }
+
+    // Check if it starts with 0x00 0x02
+    if len(ptBytes) >= 2 && ptBytes[0] == 0x00 && ptBytes[1] == 0x02 {
+        return true
+    }
+
+    return false
+}
+
+// Interval represents a range [a, b]
+type Interval struct {
+    a *big.Int
+    b *big.Int
+}
+
+// Bleichenbacher's attack on PKCS#1 v1.5
+func BleichenbacherAttack(c *big.Int, pub fifth.RSAPublicKey) []byte {
+    n := pub.N
+    e := pub.E
+    k := n.BitLen() / 8
+
+    B := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(8*(k-2))), nil)
+    twoB := new(big.Int).Mul(big.NewInt(2), B)
+    threeB := new(big.Int).Mul(big.NewInt(3), B)
+    threeBminusOne := new(big.Int).Sub(threeB, big.NewInt(1))
+
+    // Step 1: Blinding (skip if already PKCS conforming)
+    c0 := new(big.Int).Set(c)
+
+    if !PKCS1v15PaddingOracle(c0) {
+        log.Fatal("Ciphertext is not PKCS conforming")
+    }
+
+    // Step 2: Initialize
+    M := []Interval{{a: twoB, b: threeBminusOne}}
+    i := 1
+
+    // Step 2.a: Start the search
+    s := new(big.Int).Div(n, threeB)
+
+    for {
+        // Find next s
+        cs := new(big.Int).Mul(c0, fifth.ExpInt(s, e, n))
+        cs.Mod(cs, n)
+
+        if PKCS1v15PaddingOracle(cs) {
+            break
+        }
+        s.Add(s, big.NewInt(1))
+    }
+
+    for {
+        // Step 3: Narrowing the set of solutions
+        Mnew := []Interval{}
+        fmt.Printf("Iteration %d: s=%v, M has %d intervals\n", i, s, len(M))
+
+        for _, interval := range M {
+            rMin := new(big.Int).Mul(interval.a, s)
+            rMin.Sub(rMin, threeBminusOne)
+            rMin.Add(rMin, n)
+            rMin.Sub(rMin, big.NewInt(1))
+            rMin.Div(rMin, n)
+
+            rMax := new(big.Int).Mul(interval.b, s)
+            rMax.Sub(rMax, twoB)
+            rMax.Div(rMax, n)
+
+            for r := new(big.Int).Set(rMin); r.Cmp(rMax) <= 0; r.Add(r, big.NewInt(1)) {
+                // Calculate new interval
+                rn := new(big.Int).Mul(r, n)
+
+                aCandidate := new(big.Int).Add(twoB, rn)
+                aCandidate.Add(aCandidate, s)
+                aCandidate.Sub(aCandidate, big.NewInt(1))
+                aCandidate.Div(aCandidate, s)
+
+                bCandidate := new(big.Int).Add(threeBminusOne, rn)
+                bCandidate.Div(bCandidate, s)
+
+                // Intersect with current interval
+                newA := new(big.Int)
+                if aCandidate.Cmp(interval.a) > 0 {
+                    newA.Set(aCandidate)
+                } else {
+                    newA.Set(interval.a)
+                }
+
+                newB := new(big.Int)
+                if bCandidate.Cmp(interval.b) < 0 {
+                    newB.Set(bCandidate)
+                } else {
+                    newB.Set(interval.b)
+                }
+
+                if newA.Cmp(newB) <= 0 {
+                    Mnew = append(Mnew, Interval{a: newA, b: newB})
+                }
+            }
+        }
+
+        M = Mnew
+
+        // Step 4: Check if we're done
+        if len(M) == 1 && M[0].a.Cmp(M[0].b) == 0 {
+            m := M[0].a
+            return m.Bytes()
+        }
+
+        // Step 2.b or 2.c: Search for next s
+        if len(M) > 1 {
+            // Step 2.b: Searching with more than one interval
+            s.Add(s, big.NewInt(1))
+            for {
+                cs := new(big.Int).Mul(c0, fifth.ExpInt(s, e, n))
+                cs.Mod(cs, n)
+
+                if PKCS1v15PaddingOracle(cs) {
+                    break
+                }
+                s.Add(s, big.NewInt(1))
+            }
+        } else {
+            // Step 2.c: Searching with one interval
+            a := M[0].a
+            b := M[0].b
+
+            ri := new(big.Int).Mul(big.NewInt(2), b)
+            ri.Sub(ri, twoB)
+            ri.Mul(ri, s)
+            ri.Add(ri, n)
+            ri.Sub(ri, big.NewInt(1))
+            ri.Div(ri, n)
+
+            found := false
+            for !found {
+                sMin := new(big.Int).Add(twoB, new(big.Int).Mul(ri, n))
+                sMin.Add(sMin, b)
+                sMin.Sub(sMin, big.NewInt(1))
+                sMin.Div(sMin, b)
+
+                sMax := new(big.Int).Add(threeB, new(big.Int).Mul(ri, n))
+                sMax.Div(sMax, a)
+
+                for s = new(big.Int).Set(sMin); s.Cmp(sMax) < 0; s.Add(s, big.NewInt(1)) {
+                    cs := new(big.Int).Mul(c0, fifth.ExpInt(s, e, n))
+                    cs.Mod(cs, n)
+
+                    if PKCS1v15PaddingOracle(cs) {
+                        found = true
+                        break
+                    }
+                }
+
+                if !found {
+                    ri.Add(ri, big.NewInt(1))
+                }
+            }
+        }
+
+        i++
+    }
+}
+
+func FortySeventh() {
+    k := pub47.N.BitLen() / 8
+
+    // Create a message
+    msg := []byte("kick it, CC")
+
+    // Pad the message
+    paddedMsg, err := PKCS1v15Pad(msg, k)
+    if err != nil {
+        log.Fatalf("Padding error: %v", err)
+    }
+
+    // Convert to big int and encrypt
+    msgInt := new(big.Int).SetBytes(paddedMsg)
+    ct := fifth.RSAEncrypt(pub47, msgInt)
+
+    // Verify the oracle works
+    fmt.Printf("Original message is PKCS conforming: %v\n", PKCS1v15PaddingOracle(ct))
+
+    // Attack!
+    fmt.Println("Starting Bleichenbacher's attack...")
+    recovered := BleichenbacherAttack(ct, pub47)
+
+    // Unpad the recovered message
+    unpadded, err := PKCS1v15Unpad(recovered)
+    if err != nil {
+        fmt.Printf("Recovered bytes (with padding): %x\n", recovered)
+        fmt.Printf("Unpadding error: %v\n", err)
+        // Try to extract the message anyway
+        if len(recovered) > 11 {
+            for i := 2; i < len(recovered); i++ {
+                if recovered[i] == 0x00 && i >= 10 {
+                    fmt.Printf("Recovered message: %s\n", string(recovered[i+1:]))
+                    break
+                }
+            }
+        }
+    } else {
+        fmt.Printf("Recovered message: %s\n", string(unpadded))
+    }
+}

@@ -87,6 +87,7 @@ func server() {
 	var K []byte
 	savedI := ""
 	savedA := ""
+	_ = savedI  // suppress unused warning
 	http.HandleFunc("/first", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusBadRequest
 		if r.Method != "POST" {
@@ -256,6 +257,7 @@ func server2() {
 	var K []byte
 	savedI := ""
 	savedA := ""
+	_ = savedI  // suppress unused warning
 	http.HandleFunc("/first", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusBadRequest
 		if r.Method != "POST" {
@@ -409,6 +411,7 @@ func serverMITM() {
 	var A *big.Int
 	savedI := ""
 	savedA := ""
+	_ = savedI  // suppress unused warning
 	http.HandleFunc("/first", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusBadRequest
 		if r.Method != "POST" {
